@@ -113,3 +113,46 @@ build:all-targets-master:
       - examples/atecc608_ecdsa/build_*/flasher_args.json
       - examples/atecc608_ecdsa/build_*/config/sdkconfig.json
     expire_in: 1 week
+
+build:ecu-firmware-all-targets-latest-release:
+  stage: build
+  tags:
+    - build
+  parallel:
+    matrix:
+      - IDF_VER: ["release-v5.5"]
+  image: espressif/idf:${IDF_VER}
+  <<: *setup_idf
+  script:
+    - unset EXTRA_CFLAGS
+    - unset EXTRA_CXXFLAGS
+    - echo "Building esp_cryptoauth_utility/firmware with ESP-IDF ${IDF_VER}"
+    - |
+      for target in esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4; do
+        echo "Building for $target"
+        idf-build-apps build --target $target --paths esp_cryptoauth_utility/firmware --build-dir build_${target} || exit 1
+
+        echo "Generating ecu_firmware.bin from ELF using esptool.py for $target"
+        esptool.py --chip $target \
+          elf2image esp_cryptoauth_utility/firmware/build_${target}/ecu_firmware.elf \
+          --output esp_cryptoauth_utility/firmware/build_${target}/ecu_firmware.bin || exit 1
+
+        echo "Writing info.txt for $target"
+        git_commit_sha=$(git -C $IDF_PATH rev-parse HEAD)
+        bin_sha1=$(sha1sum esp_cryptoauth_utility/firmware/build_${target}/ecu_firmware.bin | awk '{ print $1 }')
+        {
+          echo "ESP-IDF Version: ${IDF_VER}"
+          echo "Git Commit: ${git_commit_sha}"
+          echo "ecu_firmware.bin SHA1: ${bin_sha1}"
+        } > esp_cryptoauth_utility/firmware/build_${target}/info.txt
+      done
+  allow_failure: false
+  artifacts:
+    when: always
+    paths:
+      - esp_cryptoauth_utility/firmware/build_*/ecu_firmware.elf
+      - esp_cryptoauth_utility/firmware/build_*/ecu_firmware.bin
+      - esp_cryptoauth_utility/firmware/build_*/info.txt
+      - esp_cryptoauth_utility/firmware/build_*/flasher_args.json
+      - esp_cryptoauth_utility/firmware/build_*/config/sdkconfig.json
+    expire_in: 1 week

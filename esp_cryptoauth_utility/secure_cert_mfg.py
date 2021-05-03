@@ -131,9 +131,10 @@ def main():
     retval = init_mfg.exec_cmd(args.port, 'init {0} {1}'.format(args.i2c_sda_pin, args.i2c_scl_pin))
     hs.serial.esp_cmd_check_ok(retval, 'init {0} {1}'.format(args.i2c_sda_pin, args.i2c_scl_pin))
 
-    if 'TrustCustom' in retval[1]['Return']:
+    device_type = retval[1]['Return']
+    if 'TrustCustom' or 'TrustManager' in retval[1]['Return']:
         print('ATECC608 chip is of type TrustCustom')
-        provision_trustcustom_device(args, init_mfg)
+        provision_trustcustom_device(args, init_mfg, device_type)
     elif 'Trust&Go' in retval[1]['Return']:
         print('ATECC608 chip is of type Trust&Go')
         hs.manifest.generate_manifest_file(args, init_mfg)
@@ -145,7 +146,7 @@ def main():
         exit(0)
 
 
-def provision_trustcustom_device(args, init_mfg):
+def provision_trustcustom_device(args, init_mfg, device_type):
 
     retval = init_mfg.exec_cmd(args.port, 'print-chip-info')
     hs.serial.esp_cmd_check_ok(retval, 'print-chip-info')
@@ -213,6 +214,10 @@ def provision_trustcustom_device(args, init_mfg):
 
     signer_cert_data = esp_handle_file(args.signer_cert, 'read')
     cert_der = esp_handle_file(args.signer_cert, 'pem_read')
+
+    if 'TrustManager' in device_type:
+        return True
+
     print('Signer cert is:')
     print(signer_cert_data)
 
