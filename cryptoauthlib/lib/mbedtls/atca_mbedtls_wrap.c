@@ -879,11 +879,11 @@ ATCA_STATUS atcac_pk_derive(
 
 
 #ifndef MBEDTLS_ECDSA_SIGN_ALT
-/* #include "mbedtls/pk_internal.h" */
+/* #include "mbedtls/pk_wrap.h" */
 /** Patched by copying mbedtls_pk_info_t here */
 #include "mbedtls/pk.h"
-struct mbedtls_pk_info_t
-{
+
+struct mbedtls_pk_info_t {
     /** Public key type */
     mbedtls_pk_type_t type;
 
@@ -891,54 +891,79 @@ struct mbedtls_pk_info_t
     const char *name;
 
     /** Get key size in bits */
-    size_t (*get_bitlen)( const void * );
+    size_t (*get_bitlen)(mbedtls_pk_context *pk);
 
     /** Tell if the context implements this type (e.g. ECKEY can do ECDSA) */
-    int (*can_do)( mbedtls_pk_type_t type );
+    int (*can_do)(mbedtls_pk_type_t type);
 
     /** Verify signature */
-    int (*verify_func)( void *ctx, mbedtls_md_type_t md_alg,
-                        const unsigned char *hash, size_t hash_len,
-                        const unsigned char *sig, size_t sig_len );
+    int (*verify_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
+                       const unsigned char *hash, size_t hash_len,
+                       const unsigned char *sig, size_t sig_len);
 
     /** Make signature */
-    int (*sign_func)( void *ctx, mbedtls_md_type_t md_alg,
-                      const unsigned char *hash, size_t hash_len,
-                      unsigned char *sig, size_t *sig_len,
-                      int (*f_rng)(void *, unsigned char *, size_t),
-                      void *p_rng );
+    int (*sign_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
+                     const unsigned char *hash, size_t hash_len,
+                     unsigned char *sig, size_t sig_size, size_t *sig_len,
+                     int (*f_rng)(void *, unsigned char *, size_t),
+                     void *p_rng);
+
+#if defined(MBEDTLS_ECDSA_C) && defined(MBEDTLS_ECP_RESTARTABLE)
+    /** Verify signature (restartable) */
+    int (*verify_rs_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
+                          const unsigned char *hash, size_t hash_len,
+                          const unsigned char *sig, size_t sig_len,
+                          void *rs_ctx);
+
+    /** Make signature (restartable) */
+    int (*sign_rs_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
+                        const unsigned char *hash, size_t hash_len,
+                        unsigned char *sig, size_t sig_size, size_t *sig_len,
+                        int (*f_rng)(void *, unsigned char *, size_t),
+                        void *p_rng, void *rs_ctx);
+#endif /* MBEDTLS_ECDSA_C && MBEDTLS_ECP_RESTARTABLE */
 
     /** Decrypt message */
-    int (*decrypt_func)( void *ctx, const unsigned char *input, size_t ilen,
-                         unsigned char *output, size_t *olen, size_t osize,
-                         int (*f_rng)(void *, unsigned char *, size_t),
-                         void *p_rng );
+    int (*decrypt_func)(mbedtls_pk_context *pk, const unsigned char *input, size_t ilen,
+                        unsigned char *output, size_t *olen, size_t osize,
+                        int (*f_rng)(void *, unsigned char *, size_t),
+                        void *p_rng);
 
     /** Encrypt message */
-    int (*encrypt_func)( void *ctx, const unsigned char *input, size_t ilen,
-                         unsigned char *output, size_t *olen, size_t osize,
-                         int (*f_rng)(void *, unsigned char *, size_t),
-                         void *p_rng );
+    int (*encrypt_func)(mbedtls_pk_context *pk, const unsigned char *input, size_t ilen,
+                        unsigned char *output, size_t *olen, size_t osize,
+                        int (*f_rng)(void *, unsigned char *, size_t),
+                        void *p_rng);
 
     /** Check public-private key pair */
-    int (*check_pair_func)( const void *pub, const void *prv );
+    int (*check_pair_func)(mbedtls_pk_context *pub, mbedtls_pk_context *prv,
+                           int (*f_rng)(void *, unsigned char *, size_t),
+                           void *p_rng);
 
     /** Allocate a new context */
-    void * (*ctx_alloc_func)( void );
+    void * (*ctx_alloc_func)(void);
 
     /** Free the given context */
-    void (*ctx_free_func)( void *ctx );
+    void (*ctx_free_func)(void *ctx);
+
+#if defined(MBEDTLS_ECDSA_C) && defined(MBEDTLS_ECP_RESTARTABLE)
+    /** Allocate the restart context */
+    void *(*rs_alloc_func)(void);
+
+    /** Free the restart context */
+    void (*rs_free_func)(void *rs_ctx);
+#endif /* MBEDTLS_ECDSA_C && MBEDTLS_ECP_RESTARTABLE */
 
     /** Interface with the debug module */
-    void (*debug_func)( const void *ctx, mbedtls_pk_debug_item *items );
+    void (*debug_func)(mbedtls_pk_context *pk, mbedtls_pk_debug_item *items);
 
 };
 
 #include "atcacert/atcacert_der.h"
 
-static size_t atca_mbedtls_eckey_get_bitlen(const void * ctx)
+static size_t atca_mbedtls_eckey_get_bitlen(mbedtls_pk_context *pk)
 {
-    return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->get_bitlen(ctx);
+    return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->get_bitlen(pk);
 }
 
 static int atca_mbedtls_eckey_can_do(mbedtls_pk_type_t type)
@@ -946,7 +971,7 @@ static int atca_mbedtls_eckey_can_do(mbedtls_pk_type_t type)
     return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->can_do(type);
 }
 
-static int atca_mbedtls_eckey_verify(void *ctx, mbedtls_md_type_t md_alg,
+static int atca_mbedtls_eckey_verify(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
                                      const unsigned char *hash, size_t hash_len,
                                      const unsigned char *sig, size_t sig_len)
 {
@@ -954,7 +979,7 @@ static int atca_mbedtls_eckey_verify(void *ctx, mbedtls_md_type_t md_alg,
     return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->verify_func(ctx, md_alg, hash, hash_len, sig, sig_len);
 #else
     int ret = -1;
-    mbedtls_ecp_keypair *ecp = (mbedtls_ecp_keypair*)ctx;
+    mbedtls_ecp_keypair *ecp = mbedtls_pk_ec(*pk);
 
     (void)md_alg;
     (void)hash_len;
@@ -1040,14 +1065,14 @@ static int atca_mbedtls_eckey_verify(void *ctx, mbedtls_md_type_t md_alg,
 #endif
 }
 
-static int atca_mbedtls_eckey_sign(void *ctx, mbedtls_md_type_t md_alg,
+static int atca_mbedtls_eckey_sign(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg,
                                    const unsigned char *hash, size_t hash_len,
-                                   unsigned char *sig, size_t *sig_len,
+                                   unsigned char *sig, size_t sig_size, size_t *sig_len,
                                    int (*f_rng)(void *, unsigned char *, size_t),
                                    void *p_rng)
 {
     int ret = -1;
-    mbedtls_ecp_keypair *ecp = (mbedtls_ecp_keypair*)ctx;
+    mbedtls_ecp_keypair *ecp = mbedtls_pk_ec(*pk);
 
     ((void)md_alg);
     ((void)f_rng);
@@ -1073,9 +1098,11 @@ static int atca_mbedtls_eckey_sign(void *ctx, mbedtls_md_type_t md_alg,
     return ret;
 }
 
-static int atca_mbedtls_eckey_check_pair(const void *pub, const void *prv)
+static int atca_mbedtls_eckey_check_pair(mbedtls_pk_context *pub, mbedtls_pk_context *prv,
+                           int (*f_rng)(void *, unsigned char *, size_t),
+                           void *p_rng)
 {
-    return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->check_pair_func(pub, prv);
+    return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->check_pair_func(pub, prv, f_rng, p_rng);
 }
 
 static void * atca_mbedtls_eckey_alloc(void)
@@ -1088,9 +1115,9 @@ static void atca_mbedtls_eckey_free(void * ctx)
     mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->ctx_free_func(ctx);
 }
 
-static void atca_mbedtls_eckey_debug(const void *ctx, mbedtls_pk_debug_item *items)
+static void atca_mbedtls_eckey_debug(mbedtls_pk_context *pk, mbedtls_pk_debug_item *items)
 {
-    mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->debug_func(ctx, items);
+    mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->debug_func(pk, items);
 }
 
 const mbedtls_pk_info_t atca_mbedtls_eckey_info = {
