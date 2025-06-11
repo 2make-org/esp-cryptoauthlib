@@ -28,25 +28,19 @@
 #include "cryptoauthlib.h"
 
 #ifdef ATCA_PRINTF
-static FILE * g_trace_fp;
-
-void atca_trace_config(FILE* fp)
-{
-    g_trace_fp = fp;
-}
-
-ATCA_STATUS atca_trace_msg(ATCA_STATUS status, const char * msg)
-{
-    if (ATCA_SUCCESS != status)
-    {
-        (void)fprintf(NULL != g_trace_fp ? g_trace_fp : stderr, msg, status);
-        (void)fflush(NULL != g_trace_fp ? g_trace_fp : stderr);
-    }
-    return status;
-}
-#endif
-
 ATCA_STATUS atca_trace(ATCA_STATUS status)
 {
     return status;
 }
+
+#include "esp_log.h"
+ATCA_STATUS atca_trace_msg(ATCA_STATUS status, const char * msg)
+{
+    if (ATCA_SUCCESS == status)
+    {
+        return status;
+    }
+    ESP_LOGE("ATCA", "%s: %d", msg, status);
+    return status;
+}
+#endif
