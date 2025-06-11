@@ -676,11 +676,10 @@ ATCA_STATUS atcac_pk_free(
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
-
     if (ctx)
     {
-        mbedtls_pk_init(ctx);
-        status = ATCA_SUCCESS;
+        void* tmp_ptr = ctx;
+        mbedtls_pk_free((mbedtls_pk_context*)tmp_ptr);
     }
     return status;
 }
