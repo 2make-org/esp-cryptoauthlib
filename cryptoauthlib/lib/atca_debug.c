@@ -26,7 +26,7 @@
  */
 
 #include <cryptoauthlib.h>
-
+#if 0
 FILE * g_trace_fp;
 
 void atca_trace_config(FILE* fp)
@@ -48,3 +48,15 @@ ATCA_STATUS atca_trace_msg(ATCA_STATUS status, const char * msg)
     }
     return status;
 }
+#else
+#include "esp_log.h"
+ATCA_STATUS atca_trace_msg(ATCA_STATUS status, const char * msg)
+{
+    if (ATCA_SUCCESS == status)
+    {
+        return status;
+    }
+    ESP_LOGE("ATCA", "%s: %d", msg, status);
+    return status;
+}
+#endif
