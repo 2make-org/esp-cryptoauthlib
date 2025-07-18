@@ -65,7 +65,18 @@ ATCA_STATUS calib_random(ATCADevice device, uint8_t *rand_out)
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+
+        uint32_t retries = 2;
+        do {
+            if ((status = atca_execute_command(&packet, device)) == ATCA_SUCCESS)
+            {
+                break;
+            }
+            ATCA_TRACE(status, "calib_random - execution failed -- retrying");
+            atca_delay_ms(20);
+        } while (--retries > 0);
+        
+        if (status != ATCA_SUCCESS)
         {
             ATCA_TRACE(status, "calib_random - execution failed");
             break;
