@@ -54,6 +54,7 @@ ATCA_STATUS atca_trace_msg(ATCA_STATUS status, const char * msg)
 {
     if (ATCA_SUCCESS == status)
     {
+        ESP_LOGI("ATCA", "%s: %d", msg, status);
         return status;
     }
     ESP_LOGE("ATCA", "%s: %d", msg, status);
