@@ -72,25 +72,36 @@ ATCA_STATUS calib_random(ATCADevice device, uint8_t *rand_out)
 
         (void)memset(packet, 0x00, sizeof(ATCAPacket));
 
-        // build an random command
-        packet->param1 = RANDOM_SEED_UPDATE;
-        packet->param2 = 0x0000;
-
-        if ((status = atRandom(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
-        {
-            (void)ATCA_TRACE(status, "atRandom - failed");
-            break;
-        }
-
-
-        uint32_t retries = 2;
+        uint32_t retries = 3;
         do {
+            // build an random command
+            packet->param1 = RANDOM_SEED_UPDATE;
+            packet->param2 = 0x0000;
+
+            if ((status = atRandom(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
+            {
+                ATCA_TRACE(status, "atRandom - failed");
+                break;
+            }
+
             if ((status = atca_execute_command(packet, device)) == ATCA_SUCCESS)
             {
                 break;
             }
+
+            if (status == ATCA_HEALTH_TEST_ERROR)
+            {
+                ATCA_TRACE(status, "calib_random - health test error (perform selftest)");
+                uint8_t st_result = 0;
+                if ((status = atcab_selftest(SELFTEST_MODE_RNG, 0, &st_result)) != ATCA_SUCCESS)
+                {
+                    ATCA_TRACE(status, "calib_random - selftest failed");
+                }
+                char status_msg[64];
+                snprintf(status_msg, sizeof(status_msg), "calib_random - selftest result: %d", st_result);
+                atca_trace_msg(status, status_msg);
+            }
             ATCA_TRACE(status, "calib_random - execution failed -- retrying");
-            atca_delay_ms(20);
         } while (--retries > 0);
         
         if (status != ATCA_SUCCESS)
