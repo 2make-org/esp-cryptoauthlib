@@ -1,5 +1,7 @@
-| Supported Targets | ESP32 | ESP32-S3 | ESP32-C3 | ESP32-C5 | ESP32-C6 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- |
+## Supported Targets
+
+| Supported Target Board | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C6 | ESP32-H2 | ESP32-P4 | ESP32-S3 |
+| ---------------------- | ----- | -------- | -------- | -------- | -------- | -------- | -------- |
 
 # ECDSA sign/verify Example with ESP32 series SoC interfaced with ATECC608A
 
@@ -7,7 +9,7 @@
 
 (See the README.md file in the upper level 'examples' directory for more information about examples.)
 
-This example requires ESP32 platform interfaced with Microchip's [ATECC608A](https://www.microchip.com/wwwproducts/en/ATECC608A) Secure Element.
+This example requires a Supported Target Board interfaced with Microchip's [ATECC608A](https://www.microchip.com/wwwproducts/en/ATECC608A) Secure Element.
 
 For making the hardware connections with `ATECC608A` chip (Secure Element), please refer [this](https://github.com/espressif/esp-cryptoauthlib/blob/master/esp_cryptoauth_utility/README.md#using-atecc608a-with-esp32-wroom-32) for details.
 
