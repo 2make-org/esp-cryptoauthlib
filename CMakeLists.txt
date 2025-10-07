@@ -37,10 +37,19 @@ set(COMPONENT_REQUIRES      "mbedtls" "freertos"  "driver")
 set(COMPONENT_EXCLUDE_SRCS "${CRYPTOAUTHLIB_DIR}/atca_cfgs.c")
 set(COMPONENT_CFLAGS "ESP32")
 
+# Determine I2C driver dependency based on ESP-IDF version
+# esp_driver_i2c is available from ESP-IDF 5.3 onwards
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.3")
+    set(I2C_DRIVER_DEPENDENCY "esp_driver_i2c")
+else()
+    set(I2C_DRIVER_DEPENDENCY "")
+endif()
+
 idf_component_register(     SRC_DIRS        "${COMPONENT_SRCDIRS}"
                             INCLUDE_DIRS    "${COMPONENT_INCLUDEDIRS}"
                             PRIV_INCLUDE_DIRS "${COMPONENT_PRIV_INCLUDEDIRS}"
                             REQUIRES        "${COMPONENT_REQUIRES}"
+                            PRIV_REQUIRES   "${I2C_DRIVER_DEPENDENCY}"
                             EXCLUDE_SRCS    "${COMPONENT_EXCLUDE_SRCS}"
                             )
 set(COMPONENT_COMPILE_OPTIONS -Wno-pointer-sign -Wno-maybe-uninitialized)

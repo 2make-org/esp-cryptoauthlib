@@ -1209,8 +1209,12 @@ ATCA_STATUS atcac_pk_derive(
 
 
 #ifndef MBEDTLS_ECDSA_SIGN_ALT
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
+#include "mbedtls/pk_internal.h"
+#else
 #include "pk_internal.h"
 #include "pk_wrap.h"
+#endif
 #include "atcacert/atcacert_der.h"
 
 #if (MBEDTLS_VERSION_NUMBER < 0x03000000)
@@ -1229,7 +1233,7 @@ static int atca_mbedtls_eckey_can_do(mbedtls_pk_type_t type)
 
 
 #if (MBEDTLS_VERSION_NUMBER < 0x03000000)
-static int atca_mbedtls_eckey_verify(const void *ctx, mbedtls_md_type_t md_alg,
+static int atca_mbedtls_eckey_verify(void *ctx, mbedtls_md_type_t md_alg,
                                      const unsigned char *hash, size_t hash_len,
                                      const unsigned char *sig, size_t sig_len)
 #else
@@ -1332,7 +1336,7 @@ static int atca_mbedtls_eckey_verify(mbedtls_pk_context *ctx, mbedtls_md_type_t 
 }
 
 #if (MBEDTLS_VERSION_NUMBER < 0x03000000)
-static int atca_mbedtls_eckey_sign(const void *ctx, mbedtls_md_type_t md_alg,
+static int atca_mbedtls_eckey_sign(void *ctx, mbedtls_md_type_t md_alg,
                                    const unsigned char *hash, size_t hash_len,
                                    unsigned char *sig, size_t *sig_len,
                                    int (*f_rng)(void *d1, unsigned char *d2, size_t d3),
@@ -1378,7 +1382,11 @@ static int atca_mbedtls_eckey_check_pair(const void *pub, const void *prv)
 static int atca_mbedtls_eckey_check_pair(mbedtls_pk_context *pub, mbedtls_pk_context *prv, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng)
 #endif
 {
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
+    return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->check_pair_func(pub, prv);
+#else
     return mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)->check_pair_func(pub, prv, mbedtls_ctr_drbg_random, NULL);
+#endif
 }
 
 static void * atca_mbedtls_eckey_alloc(void)
