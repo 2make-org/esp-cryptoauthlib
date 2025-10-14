@@ -254,7 +254,7 @@ int atcacert_der_dec_integer(const uint8_t* der_int,
 {
     int ret = 0;
     size_t der_length_size = 0;
-    size_t int_data_size_calc = 0;
+    uint32_t int_data_size_calc = 0;
 
     if (der_int == NULL || der_int_size == NULL || (int_data != NULL && int_data_size == NULL))
     {
