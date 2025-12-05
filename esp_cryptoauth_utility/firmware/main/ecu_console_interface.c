@@ -30,7 +30,7 @@ static const char *TAG = "ECU Console Interface";
 static ecu_console_interface_t *console_interface = NULL;
 #define ECU_CONSOLE_INTERFACE_TX_BUFFER_SIZE 2048
 #define ECU_CONSOLE_INTERFACE_RX_BUFFER_SIZE 2048
-#define ECU_CONSOLE_INTERFACE_TIMEOUT 500
+#define ECU_CONSOLE_INTERFACE_TIMEOUT 1000
 
 #if SOC_UART_SUPPORTED
 #define ECU_UART_NUM UART_NUM_0
