@@ -110,9 +110,118 @@ int convert_pem_to_der( const unsigned char *input, size_t ilen,
 
 extern void hal_esp32_i2c_set_pin_config(uint8_t i2c_sda_pin, uint8_t i2c_scl_pin);
 
-esp_err_t init_atecc608_device(char *device_type)
-{   int ret = 0;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 2, 0) && !defined(CONFIG_ATCA_I2C_USE_LEGACY_DRIVER)
+#include "driver/i2c_master.h"
+#include "soc/soc_caps.h"
 
+// Static bus handle for probing - initialized once and reused
+static i2c_master_bus_handle_t s_i2c_bus_handle = NULL;
+
+// Static variables to track bus initialization
+static uint8_t s_initialized_sda_pin = 0;
+static uint8_t s_initialized_scl_pin = 0;
+
+// Helper function to initialize I2C bus for probing (if not already initialized)
+static esp_err_t ensure_i2c_bus_initialized(uint8_t sda_pin, uint8_t scl_pin)
+{
+    if (s_i2c_bus_handle != NULL) {
+        // If pins changed, reinitialize the bus
+        if (s_initialized_sda_pin != sda_pin || s_initialized_scl_pin != scl_pin) {
+            i2c_del_master_bus(s_i2c_bus_handle);
+            s_i2c_bus_handle = NULL;
+        } else {
+            return ESP_OK;  // Bus already initialized with correct pins
+        }
+    }
+
+    // Configure I2C master bus
+    i2c_master_bus_config_t bus_config = {
+        .i2c_port = cfg_ateccx08a_i2c_default.atcai2c.bus,
+        .sda_io_num = sda_pin,
+        .scl_io_num = scl_pin,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+
+    esp_err_t ret = i2c_new_master_bus(&bus_config, &s_i2c_bus_handle);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    s_initialized_sda_pin = sda_pin;
+    s_initialized_scl_pin = scl_pin;
+
+    return ESP_OK;
+}
+
+// Helper function to probe I2C address and initialize if device is found
+static esp_err_t probe_and_init_device(uint8_t address, char *device_type, const char *device_name, uint8_t sda_pin, uint8_t scl_pin)
+{
+    esp_err_t esp_ret;
+    int ret;
+
+    // Ensure I2C bus is initialized
+    esp_ret = ensure_i2c_bus_initialized(sda_pin, scl_pin);
+    if (esp_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize I2C bus for probing address 0x%02X", address);
+        return ESP_FAIL;
+    }
+
+    // Probe the I2C address (address is 8-bit, need to convert to 7-bit for probe)
+    uint16_t probe_address = address >> 1;  // Convert 8-bit to 7-bit address
+    esp_ret = i2c_master_probe(s_i2c_bus_handle, probe_address, 50);  // 50ms timeout
+
+    // Clean up probe bus handle after probing - we'll create a new one for next probe if needed
+    // or let HAL manage it if probe succeeds
+    if (s_i2c_bus_handle != NULL) {
+        i2c_del_master_bus(s_i2c_bus_handle);
+        s_i2c_bus_handle = NULL;
+        s_initialized_sda_pin = 0;
+        s_initialized_scl_pin = 0;
+    }
+
+    if (esp_ret == ESP_OK) {
+        // Device found at this address, now initialize it properly
+        // The HAL will create its own bus handle during atcab_init
+        cfg_ateccx08a_i2c_default.atcai2c.address = address;
+        ret = atcab_init(&cfg_ateccx08a_i2c_default);
+        if (ret == ATCA_SUCCESS) {
+            ESP_LOGI(TAG, "Device is of type %s", device_name);
+            sprintf(device_type, "%s", device_name);
+            return ESP_OK;
+        }
+        // If init fails after successful probe, release and continue
+        ESP_LOGE(TAG, "Probe succeeded for address 0x%02X but atcab_init failed", address);
+        atcab_release();
+    }
+
+    return ESP_FAIL;
+}
+#endif
+
+esp_err_t init_atecc608_device(char *device_type, uint8_t i2c_sda_pin, uint8_t i2c_scl_pin)
+{
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 2, 0) && !defined(CONFIG_ATCA_I2C_USE_LEGACY_DRIVER)
+    // Use i2c_master_probe to check each address before initializing
+
+    if (probe_and_init_device(0xC0, device_type, "TrustCustom", i2c_sda_pin, i2c_scl_pin) == ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (probe_and_init_device(0x6A, device_type, "Trust&Go", i2c_sda_pin, i2c_scl_pin) == ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (probe_and_init_device(0x6C, device_type, "TrustFlex", i2c_sda_pin, i2c_scl_pin) == ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (probe_and_init_device(0x70, device_type, "TrustManager", i2c_sda_pin, i2c_scl_pin) == ESP_OK) {
+        return ESP_OK;
+    }
+#else
+    // Fallback to original method for legacy driver or older ESP-IDF versions
     cfg_ateccx08a_i2c_default.atcai2c.address = 0xC0;
     ret = atcab_init(&cfg_ateccx08a_i2c_default);
     if (ret == ATCA_SUCCESS) {
@@ -120,6 +229,7 @@ esp_err_t init_atecc608_device(char *device_type)
         sprintf(device_type, "%s", "TrustCustom");
         return ESP_OK;
     }
+    atcab_release();
 
     cfg_ateccx08a_i2c_default.atcai2c.address = 0x6A;
     ret = atcab_init(&cfg_ateccx08a_i2c_default);
@@ -128,6 +238,7 @@ esp_err_t init_atecc608_device(char *device_type)
         sprintf(device_type, "%s", "Trust&Go");
         return ESP_OK;
     }
+    atcab_release();
 
     cfg_ateccx08a_i2c_default.atcai2c.address = 0x6C;
     ret = atcab_init(&cfg_ateccx08a_i2c_default);
@@ -136,6 +247,7 @@ esp_err_t init_atecc608_device(char *device_type)
         sprintf(device_type, "%s", "TrustFlex");
         return ESP_OK;
     }
+    atcab_release();
 
     cfg_ateccx08a_i2c_default.atcai2c.address = 0x70;
     ret = atcab_init(&cfg_ateccx08a_i2c_default);
@@ -144,6 +256,8 @@ esp_err_t init_atecc608_device(char *device_type)
         sprintf(device_type, "%s", "TrustManager");
         return ESP_OK;
     }
+    atcab_release();
+#endif
 
     return ESP_FAIL;
 }
@@ -156,7 +270,7 @@ esp_err_t init_atecc608a(char *device_type, uint8_t i2c_sda_pin, uint8_t i2c_scl
     hal_esp32_i2c_set_pin_config(i2c_sda_pin,i2c_scl_pin);
     ESP_LOGI(TAG, "I2C pins selected are SDA = %d, SCL = %d", i2c_sda_pin, i2c_scl_pin);
 
-    esp_err_t esp_ret = init_atecc608_device(device_type);
+    esp_err_t esp_ret = init_atecc608_device(device_type, i2c_sda_pin, i2c_scl_pin);
     if (esp_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize atca device");
     }
