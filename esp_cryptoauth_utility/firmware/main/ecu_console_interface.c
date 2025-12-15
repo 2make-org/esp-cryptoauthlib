@@ -17,9 +17,12 @@
 #include "ecu_console_interface.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #if SOC_UART_SUPPORTED
 #include <driver/uart.h>
+#include "hal/uart_types.h"
 #endif
 
 #if SOC_USB_SERIAL_JTAG_SUPPORTED
@@ -27,6 +30,7 @@
 #endif
 
 static const char *TAG = "ECU Console Interface";
+const char *prompt = "Initializing Command line: >>";
 static ecu_console_interface_t *console_interface = NULL;
 #define ECU_CONSOLE_INTERFACE_TX_BUFFER_SIZE 2048
 #define ECU_CONSOLE_INTERFACE_RX_BUFFER_SIZE 2048
@@ -35,9 +39,43 @@ static ecu_console_interface_t *console_interface = NULL;
 #if SOC_UART_SUPPORTED
 #define ECU_UART_NUM UART_NUM_0
 #define ECU_UART_INTR_ALLOC_FLAGS 0
+#define ECU_UART_BAUD_RATE 115200
 static esp_err_t uart_install()
 {
-    return uart_driver_install(ECU_UART_NUM, ECU_CONSOLE_INTERFACE_RX_BUFFER_SIZE, ECU_CONSOLE_INTERFACE_TX_BUFFER_SIZE, 0, NULL, 0);
+    esp_err_t ret;
+
+    // Install UART driver
+    ret = uart_driver_install(ECU_UART_NUM, ECU_CONSOLE_INTERFACE_RX_BUFFER_SIZE, ECU_CONSOLE_INTERFACE_TX_BUFFER_SIZE, 0, NULL, ECU_UART_INTR_ALLOC_FLAGS);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    // Configure UART parameters (baud rate, data bits, stop bits, etc.)
+    uart_config_t uart_config = {
+        .baud_rate = ECU_UART_BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    ret = uart_param_config(ECU_UART_NUM, &uart_config);
+    if (ret != ESP_OK) {
+        uart_driver_delete(ECU_UART_NUM);
+        return ret;
+    }
+
+    // Set UART pins (use default pins if not specified)
+    ret = uart_set_pin(ECU_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (ret != ESP_OK) {
+        uart_driver_delete(ECU_UART_NUM);
+        return ret;
+    }
+
+    // Note: We flush RX buffer right before reading, not here, to ensure we clear any stale data
+    // right before we expect to receive the "version" command
+
+    return ESP_OK;
 }
 
 static esp_err_t uart_uninstall()
@@ -132,7 +170,13 @@ esp_err_t ecu_initialize_console_interface(void)
 {
     esp_err_t esp_ret = ESP_FAIL;
     int ret = 0;
+    int ret_usb = -1;
+    int ret_uart = -1;
     char linebuf[8];
+    char linebuf_usb[8];
+    char linebuf_uart[8];
+    bool usb_tried = false;
+    bool uart_tried = false;
 
     ESP_LOGI(TAG, "Free heap: %ld bytes", esp_get_free_heap_size());
 
@@ -144,15 +188,25 @@ esp_err_t ecu_initialize_console_interface(void)
         return esp_ret;
     }
     bzero(linebuf, sizeof(linebuf));
-    printf("Initializing Command line: >>");
-    ret = console_interface->read_bytes((uint8_t *)linebuf, strlen("version"), pdMS_TO_TICKS(ECU_CONSOLE_INTERFACE_TIMEOUT));  // Adjust size for "version"
+    // Write prompt directly to the interface being tested, not via printf (which goes to console)
+    console_interface->write_bytes(prompt, strlen(prompt), portMAX_DELAY);
+    console_interface->wait_tx_done(pdMS_TO_TICKS(100));  // Wait for transmission to complete
+    // Small delay to give host time to see prompt and respond
+    vTaskDelay(pdMS_TO_TICKS(100));  // Increased delay to ensure host has time to send
+    ret = console_interface->read_bytes((uint8_t *)linebuf, strlen("version"), pdMS_TO_TICKS(ECU_CONSOLE_INTERFACE_TIMEOUT));
     if (ret == strlen("version")) {
         if (memcmp(linebuf, "version", strlen("version")) == 0) {
-            printf("%s\n", PROJECT_VER);
+            // Write version response directly to the interface
+            console_interface->write_bytes(PROJECT_VER, strlen(PROJECT_VER), portMAX_DELAY);
+            console_interface->write_bytes("\n", 1, portMAX_DELAY);
             ESP_LOGI(TAG, "USB Serial JTAG interface successfully initialized");
             return ESP_OK;
         }
     }
+    // USB failed, save debug info but don't print yet (will print if UART also fails)
+    ret_usb = ret;
+    memcpy(linebuf_usb, linebuf, sizeof(linebuf));
+    usb_tried = true;
     esp_ret = console_interface->uninstall();
     if (esp_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB Serial JTAG driver");
@@ -165,18 +219,42 @@ esp_err_t ecu_initialize_console_interface(void)
     esp_ret = console_interface->install();
     if (esp_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install UART driver");
+        // UART installation failed, can't try UART, so print USB debug info if USB was tried
+        if (usb_tried) {
+            ESP_LOGE(TAG, "USB Serial JTAG read_bytes returned: %d (expected: %d)", ret_usb, (int)strlen("version"));
+            ESP_LOGE(TAG, "USB Serial JTAG received data (hex):");
+            for (int i = 0; i < sizeof(linebuf_usb); i++) {
+                ESP_LOGE(TAG, "  [%d] = 0x%02x ('%c')", i, (unsigned char)linebuf_usb[i],
+                         (linebuf_usb[i] >= 32 && linebuf_usb[i] < 127) ? linebuf_usb[i] : '.');
+            }
+        }
         return esp_ret;
     }
     bzero(linebuf, sizeof(linebuf));
-    printf("Initializing Command line: >>");
-    ret = console_interface->read_bytes((uint8_t *)linebuf, strlen("version"), pdMS_TO_TICKS(ECU_CONSOLE_INTERFACE_TIMEOUT));  // Adjust size for "version"
+
+    // Flush RX buffer BEFORE sending prompt to clear any stale data
+    uart_flush(ECU_UART_NUM);
+
+    // Write prompt directly to the interface being tested, not via printf (which goes to console)
+    console_interface->write_bytes(prompt, strlen(prompt), portMAX_DELAY);
+    console_interface->wait_tx_done(pdMS_TO_TICKS(100));  // Wait for transmission to complete
+
+    // Small delay to give host time to see prompt and respond
+    vTaskDelay(pdMS_TO_TICKS(100));  // Increased delay to ensure host has time to send
+    ret = console_interface->read_bytes((uint8_t *)linebuf, strlen("version"), pdMS_TO_TICKS(ECU_CONSOLE_INTERFACE_TIMEOUT));
     if (ret == strlen("version")) {
         if (memcmp(linebuf, "version", strlen("version")) == 0) {
-            printf("%s\n", PROJECT_VER);
+            // Write version response directly to the interface
+            console_interface->write_bytes(PROJECT_VER, strlen(PROJECT_VER), portMAX_DELAY);
+            console_interface->write_bytes("\n", 1, portMAX_DELAY);
             ESP_LOGI(TAG, "UART interface successfully initialized");
             return ESP_OK;
         }
     }
+    // UART failed, save debug info
+    ret_uart = ret;
+    memcpy(linebuf_uart, linebuf, sizeof(linebuf));
+    uart_tried = true;
     esp_ret = console_interface->uninstall();
     if (esp_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall UART driver");
@@ -184,7 +262,24 @@ esp_err_t ecu_initialize_console_interface(void)
     }
 #endif
 
+    // Both interfaces failed, print debug info for both
     ESP_LOGE(TAG, "Failed to initialize ECU console interface");
+    if (usb_tried) {
+        ESP_LOGE(TAG, "USB Serial JTAG read_bytes returned: %d (expected: %d)", ret_usb, (int)strlen("version"));
+        ESP_LOGE(TAG, "USB Serial JTAG received data (hex):");
+        for (int i = 0; i < sizeof(linebuf_usb); i++) {
+            ESP_LOGE(TAG, "  [%d] = 0x%02x ('%c')", i, (unsigned char)linebuf_usb[i],
+                     (linebuf_usb[i] >= 32 && linebuf_usb[i] < 127) ? linebuf_usb[i] : '.');
+        }
+    }
+    if (uart_tried) {
+        ESP_LOGE(TAG, "UART read_bytes returned: %d (expected: %d)", ret_uart, (int)strlen("version"));
+        ESP_LOGE(TAG, "UART received data (hex):");
+        for (int i = 0; i < sizeof(linebuf_uart); i++) {
+            ESP_LOGE(TAG, "  [%d] = 0x%02x ('%c')", i, (unsigned char)linebuf_uart[i],
+                     (linebuf_uart[i] >= 32 && linebuf_uart[i] < 127) ? linebuf_uart[i] : '.');
+        }
+    }
     return ESP_FAIL;
 }
 

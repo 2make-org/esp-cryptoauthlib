@@ -38,7 +38,7 @@ class cmd_interpreter:
     def __init__(self, port, baudrate=115200):
         # Serial Port settings
         self.port = serial.Serial()
-        self.port.timeout = 2
+        self.port.timeout = 0.2  # Shorter timeout to allow periodic resends
         self.port.baudrate = baudrate
         self.port.port = port
         self.port.open()
@@ -60,6 +60,8 @@ class cmd_interpreter:
         start_time = time.time()
         version_request_sent = False
         version_request_start_time = None
+        last_version_send_time = None
+        version_resend_interval = 0.2  # Resend every 200ms
 
         while True:
             try:
@@ -67,13 +69,25 @@ class cmd_interpreter:
                 if line != b'':
                     print(line.decode())
 
-                # Check for initialization prompt or ongoing version request
-                if b'Initializing Command line: >>' in line or version_request_sent:
+                # Check for initialization prompt
+                if b'Initializing Command line: >>' in line:
                     if not version_request_sent:
                         print('Requesting version')
                         self.port.write(b'version')
+                        self.port.flush()  # Critical: ensure data is sent immediately (especially on Mac)
                         version_request_sent = True
                         version_request_start_time = time.time()
+                        last_version_send_time = time.time()
+
+                # If we've sent version request, resend periodically until we get a response
+                if version_request_sent:
+                    current_time = time.time()
+                    # Resend version command periodically
+                    if last_version_send_time and (current_time - last_version_send_time) >= version_resend_interval:
+                        self.port.write(b'version')
+                        self.port.flush()
+                        last_version_send_time = current_time
+                        print('Resending version command')
 
                     # Check for expected version response
                     if expected_version_pattern.search(line):
@@ -81,7 +95,7 @@ class cmd_interpreter:
                         return True
 
                     # Handle version reply timeout
-                    elif (time.time() - version_request_start_time) > p_timeout:
+                    elif (current_time - version_request_start_time) > p_timeout:
                         print('version reply timed out')
                         return False
 

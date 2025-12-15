@@ -3,4 +3,6 @@ dependencies:
   ## Required IDF version
   idf:
     version: '>=4.1.0'
-  espressif/esp-cryptoauthlib: '*'
+  esp-cryptoauthlib:
+    version: "^3.5.1~7"
+    override_path: "../../../"
