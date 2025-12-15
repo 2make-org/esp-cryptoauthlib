@@ -132,8 +132,11 @@ def main():
     hs.serial.esp_cmd_check_ok(retval, 'init {0} {1}'.format(args.i2c_sda_pin, args.i2c_scl_pin))
 
     device_type = retval[1]['Return']
-    if 'TrustCustom' or 'TrustManager' in retval[1]['Return']:
+    if 'TrustCustom' in retval[1]['Return']:
         print('ATECC608 chip is of type TrustCustom')
+        provision_trustcustom_device(args, init_mfg, device_type)
+    elif 'TrustManager' in retval[1]['Return']:
+        print('ATECC608 chip is of type TrustManager')
         provision_trustcustom_device(args, init_mfg, device_type)
     elif 'Trust&Go' in retval[1]['Return']:
         print('ATECC608 chip is of type Trust&Go')
