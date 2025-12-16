@@ -138,6 +138,7 @@ def _exec_shell_cmd(self, command):
 
 
 def get_load_ram_esptool_args(stub_path):
+    """Create args object for backward compatibility with older esptool versions."""
     class EsptoolArgs(object):
         def __init__(self, attributes):
             for key, value in attributes.items():
@@ -155,9 +156,12 @@ def load_app_stub(port, baudrate, stub_path):
         print('Chip detected')
         esp.flash_spi_attach(0)
 
-        esptool_args = get_load_ram_esptool_args(stub_path)
         start_time = time.time()
-        esptool.cmds.load_ram(esp, esptool_args)
+        try:
+            esptool_args = get_load_ram_esptool_args(stub_path)
+            esptool.cmds.load_ram(esp, esptool_args)
+        except (AttributeError, TypeError, RuntimeError) as e:
+            esptool.cmds.load_ram(esp, stub_path)
         end_time = time.time()
         print('Time required to load the app into the RAM'
               ' = {}s'.format(end_time - start_time))
