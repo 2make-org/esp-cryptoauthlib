@@ -55,13 +55,17 @@ class cmd_interpreter:
         # Configuration variables
         p_timeout = 10  # Timeout for the entire initialization process
         expected_version_pattern = re.compile(rb'v\d+\.\d+\.\d+')  # Regex for vX.Y.Z
+        version_resend_interval = 0.1  # Resend every 100ms
 
         # Initialization
         start_time = time.time()
-        version_request_sent = False
-        version_request_start_time = None
-        last_version_send_time = None
-        version_resend_interval = 0.2  # Resend every 200ms
+        last_version_send_time = start_time
+
+        # Start sending "version" immediately and periodically
+        # The firmware will accept it as soon as it starts listening on this interface
+        self.port.write(b'version')
+        self.port.flush()
+        print('Sending version command')
 
         while True:
             try:
@@ -69,38 +73,21 @@ class cmd_interpreter:
                 if line != b'':
                     print(line.decode())
 
-                # Check for initialization prompt
-                if b'Initializing Command line: >>' in line:
-                    if not version_request_sent:
-                        print('Requesting version')
-                        self.port.write(b'version')
-                        self.port.flush()  # Critical: ensure data is sent immediately (especially on Mac)
-                        version_request_sent = True
-                        version_request_start_time = time.time()
-                        last_version_send_time = time.time()
+                current_time = time.time()
 
-                # If we've sent version request, resend periodically until we get a response
-                if version_request_sent:
-                    current_time = time.time()
-                    # Resend version command periodically
-                    if last_version_send_time and (current_time - last_version_send_time) >= version_resend_interval:
-                        self.port.write(b'version')
-                        self.port.flush()
-                        last_version_send_time = current_time
-                        print('Resending version command')
+                # Resend version command periodically until we get a response
+                if (current_time - last_version_send_time) >= version_resend_interval:
+                    self.port.write(b'version')
+                    self.port.flush()
+                    last_version_send_time = current_time
 
-                    # Check for expected version response
-                    if expected_version_pattern.search(line):
-                        print('Version reply received - CLI Initialized.')
-                        return True
-
-                    # Handle version reply timeout
-                    elif (current_time - version_request_start_time) > p_timeout:
-                        print('version reply timed out')
-                        return False
+                # Check for expected version response
+                if expected_version_pattern.search(line):
+                    print('Version reply received - CLI Initialized.')
+                    return True
 
                 # Handle overall timeout
-                elif (time.time() - start_time) > p_timeout:
+                if (current_time - start_time) > p_timeout:
                     print('connection timed out')
                     return False
             except UnicodeError:
