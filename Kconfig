@@ -26,10 +26,16 @@ menu "esp-cryptoauthlib"
             For ESP-IDF versions >= 5.2: New I2C driver is in use by default. Enable this option to switch back to the legacy driver if needed.
 
     config ATCA_MBEDTLS_ECDSA
-        bool "Enable Hardware ECDSA keys for mbedTLS"
+        bool "Enable Hardware ECDSA keys for mbedTLS (ESP-IDF 5.x only)"
         depends on MBEDTLS_ECDSA_C
         help
-            Enable Hardware ECDSA
+            Enable ATECC608 hardware ECDSA integration with mbedTLS using the
+            ALT mechanism. This allows using ATECC private keys for TLS client
+            authentication and other ECDSA operations.
+
+            NOTE: This option only works with ESP-IDF 5.x (mbedTLS 3.x).
+            For ESP-IDF 6.x+ (mbedTLS 4.x), use CONFIG_MBEDTLS_HARDWARE_ATECC
+            in the mbedtls component Kconfig instead.
 
     config ATCA_I2C_SDA_PIN
         int "I2C SDA pin used to communicate with the ATECC608A"
@@ -38,7 +44,7 @@ menu "esp-cryptoauthlib"
     config ATCA_I2C_SCL_PIN
         int "I2C SCL pin used to communicate with the ATECC608A"
         default 22
-       
+
     config ATCA_I2C_ADDRESS
         hex "I2C device address of the ATECC608A"
         default 0xC0 if ATECC608A_TCUSTOM

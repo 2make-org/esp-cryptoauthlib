@@ -1,27 +1,50 @@
 #
 # CMakeLists.txt file for cryptoauthlib
 #
+# This component provides the CryptoAuthLib library for ATECC608 secure elements.
+# It supports mbedTLS ALT integration for hardware-accelerated ECDSA operations.
+# For ESP-IDF 6.x+, use the direct CryptoAuthLib APIs (atcab_sign, atcab_verify_extern, etc.).
+#
 cmake_minimum_required(VERSION 3.5)
+
 set(CRYPTOAUTHLIB_DIR "cryptoauthlib/lib")
+
+# Base source directories
 set(COMPONENT_SRCDIRS       "${CRYPTOAUTHLIB_DIR}/atcacert"
                             "${CRYPTOAUTHLIB_DIR}/calib"
                             "${CRYPTOAUTHLIB_DIR}/crypto"
                             "${CRYPTOAUTHLIB_DIR}/crypto/hashes"
                             "${CRYPTOAUTHLIB_DIR}/host"
-                            "${CRYPTOAUTHLIB_DIR}/mbedtls"
                             "${CRYPTOAUTHLIB_DIR}"
                             "${CRYPTOAUTHLIB_DIR}/../app/tng"
                             "port"
                             )
 
+# Only include mbedtls wrapper files when ATCA_MBEDTLS_ECDSA is enabled
+# These files use mbedTLS ALT mechanism which is not compatible with mbedtls 4.x (ESP-IDF 6.x+)
+# For ESP-IDF 6.x+, use the ATECC driver in ESP-IDF's mbedtls component instead
+if(CONFIG_ATCA_MBEDTLS_ECDSA)
+    if("${IDF_VERSION_MAJOR}" VERSION_LESS "6")
+        list(APPEND COMPONENT_SRCDIRS "${CRYPTOAUTHLIB_DIR}/mbedtls")
+    else()
+        message(WARNING "ATCA_MBEDTLS_ECDSA is enabled but not supported on ESP-IDF 6.x+. "
+                       "Use CONFIG_MBEDTLS_HARDWARE_ATECC in ESP-IDF's mbedtls component instead.")
+    endif()
+endif()
+
+# Additional source files (HAL)
 set(COMPONENT_SRCS          "${COMPONENT_DIR}/cryptoauthlib/lib/hal/atca_hal.c"
                             "${COMPONENT_DIR}/cryptoauthlib/lib/hal/hal_freertos.c"
-                            "${COMPONENT_DIR}/cryptoauthlib/third_party/atca_mbedtls_patch.c"
                             "${COMPONENT_DIR}/cryptoauthlib/third_party/hal/esp32/hal_esp32_i2c.c"
                             "${COMPONENT_DIR}/cryptoauthlib/third_party/hal/esp32/hal_esp32_timer.c"
-                            "${COMPONENT_DIR}/cryptoauthlib/third_party/atca_mbedtls_patch.c"
                             )
 
+# Add mbedtls patch file only when mbedtls integration is enabled (ESP-IDF 5.x only)
+if(CONFIG_ATCA_MBEDTLS_ECDSA AND "${IDF_VERSION_MAJOR}" VERSION_LESS "6")
+    list(APPEND COMPONENT_SRCS "${COMPONENT_DIR}/cryptoauthlib/third_party/atca_mbedtls_patch.c")
+endif()
+
+# Include directories
 set(COMPONENT_INCLUDEDIRS   "${CRYPTOAUTHLIB_DIR}/"
                             "${CRYPTOAUTHLIB_DIR}/hal"
                             "${CRYPTOAUTHLIB_DIR}/../app/tng"
@@ -30,14 +53,17 @@ set(COMPONENT_INCLUDEDIRS   "${CRYPTOAUTHLIB_DIR}/"
                             "port"
                             )
 
-                        set(COMPONENT_PRIV_INCLUDEDIRS "port/include"
+set(COMPONENT_PRIV_INCLUDEDIRS "port/include"
                             "${COMPONENT_DIR}/cryptoauthlib/third_party/"
 )
 
-set(COMPONENT_REQUIRES      "mbedtls" "freertos"  "driver")
+# Required components
+set(COMPONENT_REQUIRES      "mbedtls" "freertos" "driver")
 
 # Don't include the default interface configurations from cryptoauthlib
 set(COMPONENT_EXCLUDE_SRCS "${CRYPTOAUTHLIB_DIR}/atca_cfgs.c")
+
+# Platform definition
 set(COMPONENT_CFLAGS "ESP32")
 
 # Determine I2C driver dependency based on ESP-IDF version
@@ -55,9 +81,12 @@ idf_component_register(     SRC_DIRS        "${COMPONENT_SRCDIRS}"
                             PRIV_REQUIRES   "${I2C_DRIVER_DEPENDENCY}"
                             EXCLUDE_SRCS    "${COMPONENT_EXCLUDE_SRCS}"
                             )
-set(COMPONENT_COMPILE_OPTIONS -Wno-pointer-sign -Wno-maybe-uninitialized)
+
+# Add additional source files
 target_sources(${COMPONENT_LIB} PRIVATE ${COMPONENT_SRCS})
 target_compile_definitions(${COMPONENT_LIB} PRIVATE ${COMPONENT_CFLAGS})
+
+# Compiler warning suppressions
 set(COMPONENT_COMPILE_OPTIONS -Wno-pointer-sign -Wno-maybe-uninitialized -Wno-nonnull)
 
 if (CONFIG_COMPILER_OPTIMIZATION_SIZE OR CONFIG_COMPILER_OPTIMIZATION_PERF)

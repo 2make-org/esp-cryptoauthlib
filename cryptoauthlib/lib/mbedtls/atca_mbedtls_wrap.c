@@ -45,11 +45,14 @@
 
 #ifdef ATCA_MBEDTLS
 
+#if (MBEDTLS_VERSION_NUMBER < 0x03000000)
+/* mbedtls 2.x uses config.h */
 #if !defined(MBEDTLS_CONFIG_FILE)
 #include "mbedtls/config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
+#endif /* MBEDTLS_VERSION_NUMBER < 0x03000000 */
 
 #if defined(MBEDTLS_PLATFORM_C)
 #include "mbedtls/platform.h"

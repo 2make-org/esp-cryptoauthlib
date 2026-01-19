@@ -23,9 +23,19 @@ This requires the `esp_idf_version.h' to be defined.
 /* Include HALS */
 #define ATCA_HAL_I2C
 #define ATCA_USE_RTOS_TIMER 1
+
+/* ATCA_MBEDTLS enables mbedTLS ALT integration for hardware ECDSA.
+ * This is only supported on ESP-IDF 5.x (mbedTLS 3.x).
+ * For ESP-IDF 6.x+ (mbedTLS 4.x), use CONFIG_MBEDTLS_HARDWARE_ATECC instead. */
 #if CONFIG_ATCA_MBEDTLS_ECDSA
+#if defined(ESP_IDF_VERSION) && ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+/* mbedTLS 4.x doesn't support the ALT mechanism used by cryptoauthlib */
+#warning "ATCA_MBEDTLS_ECDSA is not supported on ESP-IDF 6.x+. Use CONFIG_MBEDTLS_HARDWARE_ATECC instead."
+#else
 #define ATCA_MBEDTLS
 #endif
+#endif
+
 //#define ATCA_CA_SUPPORT
 /* Included device support */
 #define ATCA_ATECC608_SUPPORT

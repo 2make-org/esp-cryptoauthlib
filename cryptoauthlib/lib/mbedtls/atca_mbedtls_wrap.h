@@ -47,11 +47,19 @@
     (fp "MISRA C-2012 Rule 21.1" "Ignoring violations from third party libraries")
 #endif
 
+#include "mbedtls/version.h"
+
+#if (MBEDTLS_VERSION_NUMBER >= 0x03000000)
+/* mbedtls 3.x uses build_info.h instead of config.h */
+#include "mbedtls/build_info.h"
+#else
+/* mbedtls 2.x uses config.h */
 #if !defined(MBEDTLS_CONFIG_FILE)
 #include "mbedtls/config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
+#endif /* MBEDTLS_VERSION_NUMBER */
 
 #ifndef MBEDTLS_CMAC_C
 #define MBEDTLS_CMAC_C
