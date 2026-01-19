@@ -131,7 +131,7 @@ static void print_public_key(uint8_t *pubkey)
     ESP_LOGI(TAG, "\r\n-----BEGIN PUBLIC KEY-----\r\n%s\r\n-----END PUBLIC KEY-----", buf);
 }
 
-#if defined(HAVE_MBEDTLS_CLASSIC)
+#if defined(HAVE_MBEDTLS_CLASSIC) && (defined(MBEDTLS_ECDSA_SIGN_ALT) || defined(CONFIG_ATCA_MBEDTLS_ECDSA))
 static int atca_ecdsa_test(void)
 {
     mbedtls_pk_context pkey;
@@ -197,7 +197,7 @@ exit:
     fflush(stdout);
     return ret;
 }
-#endif /* HAVE_MBEDTLS_CLASSIC */
+#endif /* HAVE_MBEDTLS_CLASSIC && (MBEDTLS_ECDSA_SIGN_ALT || CONFIG_ATCA_MBEDTLS_ECDSA) */
 
 static void ecdsa_example_task(void *pvParameter)
 {
