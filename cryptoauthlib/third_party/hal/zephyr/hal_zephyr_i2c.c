@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/i2c.h>
 
+#include <zephyr/drivers/i2c.h>
+#include "atca_platform.h"
 #include "hal/atca_hal.h"
 
 /** \defgroup hal_ Hardware abstraction layer (hal_)
@@ -46,7 +47,7 @@ static ATCA_STATUS hal_zephyr_i2c_configure(
     const uint32_t          speed            /**< baud rate (typically 100000 or 400000) */
 )
 {
-    uint32_t i2c_cfg = I2C_MODE_MASTER | I2C_SPEED_SET(hal_zephyr_i2c_convert_speed(speed));
+    uint32_t i2c_cfg = I2C_MODE_CONTROLLER  | I2C_SPEED_SET(hal_zephyr_i2c_convert_speed(speed));
 
     if (i2c_configure(zdev, i2c_cfg)) 
     {
@@ -68,11 +69,10 @@ static ATCA_STATUS hal_zephyr_i2c_configure(
  *  \param[in] cfg pointer to HAL specific configuration data that is used to initialize this HAL
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-
 ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
-
+    
     if (iface && cfg && cfg->cfg_data)
     {
         if (!iface->hal_data)
@@ -107,23 +107,53 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
  * \param[in] iface         instance
  * \param[in] word_address  device transaction type
  * \param[in] txdata        pointer to space to bytes to send
- * \param[in] txlength      number of bytes to send
+ * \param[in] txlength      number of bytes to send 
+ *                          (txdata length excludes word address)
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
 
-ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t address, uint8_t *txdata, int txlength)
+ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t *txdata, int txlength)
 {
     struct device * zdev = (struct device *)atgetifacehaldat(iface);
+    uint8_t device_address = 0xFFu;
+    uint8_t* tmp_buf = NULL;
 
-    if (!zdev || (0 == txlength) || (NULL == txdata))
+    if (!zdev)
     {
         return ATCA_BAD_PARAM;
     }
-    if (i2c_write(zdev, txdata, txlength, (address >> 0x1)))
+
+#ifdef ATCA_ENABLE_DEPRECATED
+    device_address = ATCA_IFACECFG_VALUE(iface->mIfaceCFG, atcai2c.slave_address);
+#else
+    device_address = ATCA_IFACECFG_VALUE(iface->mIfaceCFG, atcai2c.address);
+#endif
+
+    //! Add 1 byte for word address
+    if (INT_MAX > txlength)
     {
+        txlength += 1;
+    }
+
+    if (NULL == (tmp_buf = hal_malloc((size_t)txlength)))
+    {
+        return ATCA_ALLOC_FAILURE;
+    }
+
+    tmp_buf[0] = word_address;
+
+    if ((NULL != txdata) && (1 < txlength))
+    {
+        (void)memcpy(&tmp_buf[1], txdata, (size_t)(txlength - 1));
+    }
+
+    if (i2c_write(zdev, tmp_buf, txlength, (device_address >> 0x1)))
+    {
+        hal_free(tmp_buf);
         return ATCA_TX_FAIL;
     }
-     
+
+    hal_free(tmp_buf); 
     return ATCA_SUCCESS;
 }
 

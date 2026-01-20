@@ -25,11 +25,10 @@
  * THIS SOFTWARE.
  */
 
-
 #ifndef ATCA_MBEDTLS_WRAP_H
 #define ATCA_MBEDTLS_WRAP_H
 
-#include "cryptoauthlib.h"
+#include "atca_config_check.h"
 
 #ifdef ATCA_MBEDTLS
 
@@ -55,7 +54,7 @@
 #else
 /* mbedtls 2.x uses config.h */
 #if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
+#include "mbedtls/mbedtls_config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
@@ -148,6 +147,7 @@ extern "C" {
 struct mbedtls_pk_context;
 struct mbedtls_x509_crt;
 struct atcacert_def_s;
+extern const mbedtls_pk_info_t atca_mbedtls_eckey_info;
 
 /** Structure to hold metadata - is written into the mbedtls pk structure as the private key
     bignum value 'd' which otherwise would be unused. Bignums can be any arbitrary length of
@@ -166,20 +166,29 @@ int atca_mbedtls_ecdsa_sign(const mbedtls_mpi* data, mbedtls_mpi* r, mbedtls_mpi
 int atca_mbedtls_pk_init_ext(ATCADevice device, mbedtls_pk_context* pkey, const uint16_t slotid);
 int atca_mbedtls_pk_init(mbedtls_pk_context* pkey, const uint16_t slotid);
 int atca_mbedtls_cert_add(struct mbedtls_x509_crt * cert, const struct atcacert_def_s * cert_def);
+int atca_mbedtls_random_ctx(void* ctx, unsigned char* data, size_t data_size);
 
 /* Application Callback definitions */
 
+#ifdef MBEDTLS_ECDH_C
+#ifdef MBEDTLS_ECDH_GEN_PUBLIC_ALT
 /** \brief ECDH Callback to obtain the "slot" used in ECDH operations from the
  * application
  * \return Slot Number
  */
-int atca_mbedtls_ecdh_slot_cb(void);
+typedef int (*atca_ecdh_slot_cb_t)(void);
+void atca_register_ecdh_slot_cb(atca_ecdh_slot_cb_t cb);
+#endif
 
+#ifdef MBEDTLS_ECDH_COMPUTE_SHARED_ALT
 /** \brief ECDH Callback to obtain the IO Protection secret from the application
  * \param[out] secret 32 byte array used to store the secret
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-int atca_mbedtls_ecdh_ioprot_cb(uint8_t secret[32]);
+typedef int (*atca_ecdh_ioprot_cb_t)(uint8_t secret[32]);
+void atca_register_ecdh_ioprot_cb(atca_ecdh_ioprot_cb_t cb);
+#endif
+#endif
 
 struct mbedtls_x509_crt* atcac_mbedtls_new(void);
 struct atcac_x509_ctx* atcac_x509_ctx_new(void);

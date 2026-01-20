@@ -712,6 +712,7 @@ CK_RV pkcs11_signature_verify(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_
         break;
 #endif
     default:
+        /* Do nothing */
         break;
     }
 

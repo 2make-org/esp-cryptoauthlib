@@ -4,7 +4,7 @@ CryptoAuthLib - Microchip CryptoAuthentication Library {#mainpage}
 Introduction
 ------------------------
 This library implements the APIs required to communicate with Microchip Security
-device. The family of devices supported currently are:
+devices. The family of devices supported currently are:
 
 |CryptoAuth                                      |CryptoAuth2                               |
 |-----------------------------------------------:|:-----------------------------------------|
@@ -52,11 +52,13 @@ Examples
 
 Configuration
 -----------
-In order to properly configured the library there must be a header file in your
+In order to properly configure the library there must be a header file in your
 project named `atca_config.h` at minimum this needs to contain defines for the
-hal and device types being used. Most integrations have an configuration mechanism
+hal and device types being used. Most integrations have a configuration mechanism
 for generating this file. See the [atca_config.h.in](lib/atca_config.h.in) template
-which is configured by CMake for Linux, MacOS, & Windows projects.
+which is configured by CMake for Linux, MacOS, & Windows projects. This file also 
+contains some specific options that are fully documented where the desired features 
+can be selected.
 
 An example of the configuration:
 
@@ -95,9 +97,7 @@ There are two major compiler defines that affect the operation of the library.
     changes required. The lower-level API will no longer use the new/delete
     functions and the init/release functions should be used directly.
 
-Some specific options are available in the fully documented configuration files `lib/calib/calib_config.h`,
-`atca_configuration.h`, `lib/crypto/crypto_config.h`, `lib/host/atca_host_config.h` which is also the place where features can be selected.
- We provide some configurations focused on specific use cases and the checks are enabled by default. 
+
 
 Release notes
 -----------
@@ -188,3 +188,10 @@ Edit the mchp-cryptoauth.rules file and add the following line to the file:
 ```text
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2312", MODE="0666"
 ```
+
+Updating *X.509 compressed certificate format* to support extended years 
+===========================================
+
+The X.509 compressed certificate format now supports encoding issue and expiry years beyond 2031.
+
+For implementation details, see: [Extending Certificate Years](https://github.com/MicrochipTech/cryptoauthlib/wiki/Extending-Certificate-Years)

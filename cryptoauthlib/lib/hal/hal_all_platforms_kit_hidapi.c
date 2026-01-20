@@ -55,7 +55,7 @@ ATCA_STATUS hal_kit_hid_init(ATCAIface iface, ATCAIfaceCfg* cfg)
 
     // Create the enumerate object
 #ifdef KIT_DEBUG
-    printf("Enumerate HID device(s)\n");
+    (void)printf("Enumerate HID device(s)\n");
 #endif
     (void)hid_init();
 
@@ -86,6 +86,9 @@ ATCA_STATUS hal_kit_hid_send(ATCAIface iface, uint8_t word_address, uint8_t* txd
     ATCAIfaceCfg *cfg = atgetifacecfg(iface);
     hid_device* pHid = (hid_device*)atgetifacehaldat(iface);
     int bytes_written;
+    int ret = 1;
+    uint8_t flush_buf[64] = {0};
+    int flush_cnt = 0;
 
     ((void)word_address);
     ((void)txlength);
@@ -95,13 +98,45 @@ ATCA_STATUS hal_kit_hid_send(ATCAIface iface, uint8_t word_address, uint8_t* txd
         return ATCA_BAD_PARAM;
     }
 
-#ifdef KIT_DEBUG
-    printf("HID layer: Write: %s", txdata);
-#endif
-
-    if (0 > (bytes_written = hid_write(pHid, txdata, (size_t)ATCA_IFACECFG_VALUE(cfg, atcahid.packetsize) + 1u)))
+    do
     {
-        return ATCA_TX_FAIL;
+        ret = hid_read_timeout(pHid, flush_buf, (size_t)sizeof(flush_buf), 0);
+        if (ret < 0)
+        {
+            return ATCA_TX_FAIL;
+        }
+        if (ret > 0)
+        {
+            flush_cnt++;
+        }
+    } while (ret > 0);
+
+#ifdef KIT_DEBUG
+    if (0 < flush_cnt)
+    {
+        (void)printf("HID layer: Flushed %d packets\n", flush_cnt);
+    }
+
+    (void)printf("HID layer: Write: ");
+    for (int i = 1; i < txlength; i++)
+    {
+        if (isascii(txdata[i]) == 0)
+        {
+            putchar('.');
+        }
+        else
+        {
+            putchar(txdata[i]);
+        }
+    }
+    putchar('\n');
+#endif
+    if (0 == ret)
+    {
+        if (0 > (bytes_written = hid_write(pHid, txdata, (size_t)ATCA_IFACECFG_VALUE(cfg, atcahid.packetsize) + 1u)))
+        {
+            return ATCA_TX_FAIL;
+        }
     }
 
     if ((uint32_t)bytes_written != ATCA_IFACECFG_VALUE(cfg, atcahid.packetsize) + 1u)
@@ -142,7 +177,7 @@ ATCA_STATUS hal_kit_hid_receive(ATCAIface iface, uint8_t word_address, uint8_t* 
     }
 
 #ifdef KIT_DEBUG
-    printf("HID layer: Read: %s", rxdata);
+    (void)printf("HID layer: Read: %s", rxdata);
 #endif // KIT_DEBUG
 
     return ATCA_SUCCESS;

@@ -25,12 +25,12 @@
 #include "cryptoauthlib.h"
 
 #if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
+#include "mbedtls/mbedtls_config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
 
-#ifdef MBEDTLS_ECDSA_C
+#if defined(MBEDTLS_ECDSA_C) && defined(ATCA_MBEDTLS)
 
 #include "mbedtls/asn1.h"
 #include "mbedtls/asn1write.h"

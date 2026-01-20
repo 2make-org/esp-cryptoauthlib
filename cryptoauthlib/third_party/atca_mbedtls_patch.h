@@ -22,7 +22,7 @@
 #ifndef ATCA_MBEDTLS_PATCH_H
 #define ATCA_MBEDTLS_PATCH_H
 
-#ifdef MBEDTLS_ECDSA_C
+#if defined(MBEDTLS_ECDSA_C) && defined(ATCA_MBEDTLS)
 int mbedtls_ecdsa_signature_to_asn1(const mbedtls_mpi* r, const mbedtls_mpi* s, unsigned char* sig, size_t* slen);
 #endif
 

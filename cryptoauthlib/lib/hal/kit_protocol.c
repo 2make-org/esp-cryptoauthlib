@@ -50,6 +50,7 @@
 /* Constants */
 #define KIT_MAX_SCAN_COUNT      8
 #define KIT_MAX_TX_BUF          32
+#define KIT_TA_WORDADD_SEND_LEN 20
 
 #ifndef strnchr
 // Local implementation of strnchr if it doesn't exist in the system
@@ -220,7 +221,7 @@ ATCA_STATUS kit_phy_send(ATCAIface iface, uint8_t* txdata, int txlength)
     }
 
 #ifdef KIT_DEBUG
-    printf("Kit Send (%d): %s", txlength, txdata);
+    (void)printf("Kit Send (%d): %s", txlength, txdata);
 #endif
 
     bytes_left = txlength;
@@ -344,7 +345,7 @@ ATCA_STATUS kit_phy_receive(ATCAIface iface, uint8_t* rxdata, int* rxsize)
     }
 
 #ifdef KIT_DEBUG
-    printf("Kit Recv (%d): %s", *rxsize, rxdata);
+    (void)printf("Kit Recv (%d): %s", *rxsize, rxdata);
 #endif
 
     return ATCA_SUCCESS;
@@ -544,18 +545,22 @@ ATCA_STATUS kit_post_init(ATCAIface iface)
  */
 static ATCA_STATUS kit_ta_send_to_receive(ATCAIface iface, uint8_t word_address, uint16_t* rxsize)
 {
-    ATCA_STATUS status;
+    ATCA_STATUS status = ATCA_BAD_PARAM;
     char send_instrcode[] = "T:receive(%02X%02X%02X)\n";
-    char txbuf[KIT_MAX_TX_BUF];
+    char txbuf[KIT_TA_WORDADD_SEND_LEN] = {0};
     int txbuf_size = (int)sizeof(txbuf);
+    int cpy_len = 0;
 
     // Get instruction code and response length
-    (void)snprintf(txbuf, sizeof(txbuf), send_instrcode, word_address, (uint8_t)((*rxsize >> 8) & 0xFFU), (uint8_t)(*rxsize & 0xFFU));
-    txbuf[sizeof(txbuf) - 1u] = (char)'\0';
+    cpy_len = snprintf(txbuf, sizeof(txbuf), send_instrcode, word_address, (uint8_t)((*rxsize >> 8) & 0xFFU), (uint8_t)(*rxsize & 0xFFU));
+    if((cpy_len > 0) && (cpy_len < KIT_TA_WORDADD_SEND_LEN))
+    {
+        txbuf[sizeof(txbuf) - 1u] = (char)'\0';
 
-    // Send the word address bytes
-    status = kit_phy_send(iface, (uint8_t*)txbuf, txbuf_size);
-
+        // Send the word address bytes
+        status = kit_phy_send(iface, (uint8_t*)txbuf, txbuf_size);
+    }
+    
     return status;
 }
 
@@ -582,7 +587,7 @@ static ATCA_STATUS kit_ta_receive_send_rsp(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("Kit Read: %s\r", reply);
+    (void)printf("Kit Read: %s\r", reply);
 #endif
 
     // Unwrap from kit protocol
@@ -641,7 +646,7 @@ ATCA_STATUS kit_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata, int
 
     #ifdef KIT_DEBUG
         // Print the bytes
-        printf("\nKit Write: %s", pkitbuf);
+        (void)printf("\nKit Write: %s", pkitbuf);
     #endif
 
         // Send the bytes
@@ -720,7 +725,7 @@ ATCA_STATUS kit_receive(ATCAIface iface, uint8_t word_address, uint8_t* rxdata, 
 
     #ifdef KIT_DEBUG
         // Print the bytes
-        printf("Kit Read: %s\r", pkitbuf);
+        (void)printf("Kit Read: %s\r", pkitbuf);
     #endif
 
         // Unwrap from kit protocol        
@@ -766,7 +771,7 @@ ATCA_STATUS kit_wake(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("\nKit Write: %s", wake);
+    (void)printf("\nKit Write: %s", wake);
 #endif
 
     // Receive the reply to wake "00(04...)\n"
@@ -778,7 +783,7 @@ ATCA_STATUS kit_wake(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("Kit Read: %s\n", reply);
+    (void)printf("Kit Read: %s\n", reply);
 #endif
 
     // Unwrap from kit protocol
@@ -812,7 +817,7 @@ ATCA_STATUS kit_idle(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("\nKit Write: %s", idle);
+    (void)printf("\nKit Write: %s", idle);
 #endif
 
     // Receive the reply to sleep "00()\n"
@@ -824,7 +829,7 @@ ATCA_STATUS kit_idle(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("Kit Read: %s\r", reply);
+    (void)printf("Kit Read: %s\r", reply);
 #endif
 
     // Unwrap from kit protocol
@@ -859,7 +864,7 @@ ATCA_STATUS kit_sleep(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("\nKit Write: %s", sleep);
+    (void)printf("\nKit Write: %s", sleep);
 #endif
 
     // Receive the reply to sleep "00()\n"
@@ -871,7 +876,7 @@ ATCA_STATUS kit_sleep(ATCAIface iface)
 
 #ifdef KIT_DEBUG
     // Print the bytes
-    printf("Kit Read: %s\r", reply);
+    (void)printf("Kit Read: %s\r", reply);
 #endif
 
     // Unwrap from kit protocol

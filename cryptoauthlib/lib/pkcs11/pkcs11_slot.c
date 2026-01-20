@@ -120,7 +120,7 @@ CK_VOID_PTR pkcs11_slot_initslots(CK_ULONG pulCount)
 
     if (NULL != slot_ctx_array)
     {
-        (void)memset(slot_ctx_array, 0, sizeof(pkcs11_slot_ctx) * pulCount);
+        (void)pkcs11_util_memset(slot_ctx_array, sizeof(pkcs11_slot_ctx) * pulCount, 0, sizeof(pkcs11_slot_ctx) * pulCount);
     }
     return slot_ctx_array;
 #endif

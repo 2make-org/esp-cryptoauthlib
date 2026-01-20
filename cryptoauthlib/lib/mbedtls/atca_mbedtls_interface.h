@@ -32,6 +32,12 @@
 
 #ifdef ATCA_MBEDTLS
 
+#if !defined(MBEDTLS_CONFIG_FILE)
+#include "mbedtls/mbedtls_config.h"
+#else
+#include MBEDTLS_CONFIG_FILE
+#endif
+
 #if !defined(ATCA_BUILD_SHARED_LIBS) && defined(ATCA_NO_HEAP)
 #include "atca_mbedtls_wrap.h"
 #endif
@@ -40,7 +46,7 @@
  * Indicates if this module is a provider of a SHA1 implementation
  */
 #ifndef ATCAC_SHA1_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_SHA1_C)
+#ifndef MBEDTLS_SHA1_C
 #define ATCAC_SHA1_EN                       (DEFAULT_DISABLED)
 #else
 #define ATCAC_SHA1_EN                       (DEFAULT_ENABLED)
@@ -51,7 +57,7 @@
  * Indicates if this module is a provider of a SHA256 implementation
  */
 #ifndef ATCAC_SHA256_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_SHA256_C)
+#ifndef MBEDTLS_SHA256_C
 #define ATCAC_SHA256_EN                      (DEFAULT_DISABLED)
 #else
 #define ATCAC_SHA256_EN                      (FEATURE_ENABLED)
@@ -64,7 +70,7 @@
  * Disabled by default. Use FEATURE_ENABLED to use SHA384
  */
 #ifndef ATCAC_SHA384_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_SHA384_C)
+#ifndef MBEDTLS_SHA384_C
 #define ATCAC_SHA384_EN                      (DEFAULT_DISABLED)
 #else
 #define ATCAC_SHA384_EN                      (FEATURE_DISABLED)
@@ -77,7 +83,7 @@
  * Disabled by default. Use FEATURE_ENABLED to use SHA512
  */
 #ifndef ATCAC_SHA512_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_SHA512_C)
+#ifndef MBEDTLS_SHA512_C
 #define ATCAC_SHA512_EN                      (DEFAULT_DISABLED)
 #else
 #define ATCAC_SHA512_EN                      (FEATURE_DISABLED)
@@ -88,7 +94,7 @@
  * Indicates if this module is a provider of an AES-CMAC implementation
  */
 #ifndef ATCAC_AES_CMAC_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_CMAC_C)
+#ifndef MBEDTLS_CMAC_C
 #define ATCAC_AES_CMAC_EN                   (DEFAULT_DISABLED)
 #else
 #define ATCAC_AES_CMAC_EN                   (DEFAULT_ENABLED)
@@ -99,7 +105,7 @@
  * Indicates if this module is a provider of an AES-GCM implementation
  */
 #ifndef ATCAC_AES_GCM_EN
-#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_GCM_C)
+#ifndef MBEDTLS_GCM_C
 #define ATCAC_AES_GCM_EN                    (DEFAULT_DISABLED)
 #else
 #define ATCAC_AES_GCM_EN                    (DEFAULT_ENABLED)

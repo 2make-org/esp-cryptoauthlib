@@ -148,7 +148,7 @@ CK_RV pkcs11_object_alloc(CK_SLOT_ID slotId, pkcs11_object_ptr *ppObject)
 #endif
                 if (NULL != *ppObject)
                 {
-                    (void)memset(*ppObject, 0, sizeof(pkcs11_object));
+                    (void)pkcs11_util_memset(*ppObject, sizeof(pkcs11_object), 0, sizeof(pkcs11_object));
                     pkcs11_object_cache[i].handle = pkcs11_object_alloc_handle();
                     pkcs11_object_cache[i].slotid = slotId;
                     pkcs11_object_cache[i].object = *ppObject;
@@ -512,6 +512,7 @@ CK_RV pkcs11_object_create(
             pEC_OID_Data = &pTemplate[i];
             break;
         default:
+            /* Do nothing */
             break;
         }
     }

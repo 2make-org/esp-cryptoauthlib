@@ -432,11 +432,11 @@ static ATCA_STATUS kit_host_ta_send(ascii_kit_host_context_t* ctx, int argc, cha
         size_t plen = sizeof(ctx->buffer) - 2;
         atcab_hex2bin(argv[0], strlen(argv[0]), ctx->buffer, &plen);
 
-        uint8_t address = atgetifacecfg(&ctx->device->mIface)->atcai2c.address;
+        uint8_t word_address = ctx->buffer[0];
 
         (void)atcontrol(&ctx->device->mIface, ATCA_HAL_CONTROL_SELECT, NULL, 0);
 
-        status = atsend(&ctx->device->mIface, address, ctx->buffer, plen);
+        status = atsend(&ctx->device->mIface, word_address, &(ctx->buffer[1]), plen-1);
 
         (void)atcontrol(&ctx->device->mIface, ATCA_HAL_CONTROL_DESELECT, NULL, 0);
         *rlen = 0;
@@ -465,7 +465,7 @@ static ATCA_STATUS kit_host_ta_receive(ascii_kit_host_context_t* ctx, int argc, 
 
             (void)atcontrol(&ctx->device->mIface, ATCA_HAL_CONTROL_SELECT, NULL, 0);
 
-            if (ATCA_SUCCESS != (status = atsend(&ctx->device->mIface, address, &word_address, sizeof(word_address))))
+            if (ATCA_SUCCESS != (status = atsend(&ctx->device->mIface, word_address, NULL, 0)))
             {
                 return status;
             }

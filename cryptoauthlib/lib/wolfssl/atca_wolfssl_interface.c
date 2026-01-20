@@ -897,10 +897,12 @@ ATCA_STATUS atcac_pk_sign(
     const uint8_t *         digest,
     size_t                  dig_len,
     uint8_t*                signature,
+    size_t                  sig_buf_size,
     size_t*                 sig_len
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
+    (void)sig_buf_size;
 
     if ((NULL != ctx) && (NULL != ctx->ptr) && (NULL != signature) && (NULL != digest) && (NULL != sig_len))
     {
@@ -1457,6 +1459,14 @@ void atcac_pk_ctx_free(struct atcac_pk_ctx * ctx)
     hal_free(ctx);
 }
 #endif
+
+#if ATCACERT_COMPCERT_EN
+ATCA_STATUS atcac_sw_cert_add(void * cert, const struct atcacert_def_s * cert_def)
+{
+    return ATCA_SUCCESS;
+}
+#endif
+
 #endif /* ATCA_WOLFSSL */
 #ifdef __COVERITY__
 #pragma coverity compliance end_block "CERT EXP40-C" "MISRA C-2012 Rule 10.3" "MISRA C-2012 Rule 11.3" "MISRA C-2012 Rule 11.8"

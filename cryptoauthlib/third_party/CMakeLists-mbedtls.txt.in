@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.20.0)
  
 project(mbedtls-download NONE)
  
 include(ExternalProject)
 ExternalProject_Add(mbedtls
-	URL               "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v2.28.4.tar.gz"
-	URL_HASH		  "SHA256=578c4dcd15bbff3f5cd56aa07cd4f850fc733634e3d5947be4f7157d5bfd81ac"
+	URL               "https://github.com/Mbed-TLS/mbedtls/releases/download/v3.6.3.1/mbedtls-3.6.3.1.tar.bz2"
+	URL_HASH		  "SHA256=243ed496d5f88a5b3791021be2800aac821b9a4cc16e7134aa413c58b4c20e0c"
 	SOURCE_DIR        "${CMAKE_BINARY_DIR}/downloaded/mbedtls"
 	BINARY_DIR        ""
 	CONFIGURE_COMMAND ""

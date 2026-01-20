@@ -943,11 +943,13 @@ ATCA_STATUS atcac_pk_sign(
     const uint8_t *      digest,
     size_t               dig_len,
     uint8_t*             signature,
+    size_t               sig_buf_size,
     size_t*              sig_len
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
     int ret = 0;
+    (void)sig_buf_size;
 
     if ((NULL != ctx) && (NULL != ctx->ptr))
     {
@@ -1424,6 +1426,13 @@ void atcac_aes_cmac_ctx_free(struct atcac_aes_cmac_ctx * ctx)
 void atcac_pk_ctx_free(struct atcac_pk_ctx * ctx)
 {
     hal_free(ctx);
+}
+#endif
+
+#if ATCACERT_COMPCERT_EN
+ATCA_STATUS atcac_sw_cert_add(void * cert, const struct atcacert_def_s * cert_def)
+{
+    return ATCA_SUCCESS;
 }
 #endif
 

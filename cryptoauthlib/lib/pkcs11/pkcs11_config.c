@@ -272,7 +272,7 @@ static size_t pkcs11_config_load_file(FILE* fp, char ** buf)
 }
 
 /* Parse a buffer into key value pairs. Return value should be an even value */
-static int pkcs11_config_parse_buffer(char* buffer, size_t len, int argc, char* argv[])
+static int pkcs11_config_parse_buffer(char* buf, size_t len, int argc, char* argv[])
 {
     char* s;
     uint8_t args = 0;
@@ -280,13 +280,13 @@ static int pkcs11_config_parse_buffer(char* buffer, size_t len, int argc, char* 
     bool arg = FALSE;
     bool v = FALSE;
 
-    if ((NULL == buffer) || (0u == len) || (0 >= argc) || (NULL == argv))
+    if ((NULL == buf) || (0u == len) || (0 >= argc) || (NULL == argv))
     {
         return 0;
     }
 
-    s = buffer;
-    while (s < (buffer + len) && (int)args < argc)
+    s = buf;
+    while (s < (buf + len) && (int)args < argc)
     {
         /* coverity[cert_str34_c_violation:FALSE] */
         /* coverity[misra_c_2012_rule_16_1_violation] The parsing algorithm here is well tested */

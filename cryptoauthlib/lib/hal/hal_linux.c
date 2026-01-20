@@ -105,7 +105,7 @@ ATCA_STATUS hal_alloc_shared(
 
         /* Set up a shared memory region */
         errno = 0;
-        if (0 > (fd = shm_open(pName, O_RDWR | O_CREAT | O_EXCL, 0666)))
+        if (0 > (fd = shm_open(pName, (O_RDWR | O_CREAT | O_EXCL), (mode_t)(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH))))
         {
             /* coverity[cert_err30_c_violation:FALSE] shm_open sets errno per it's specification */
             /* coverity[misra_c_2012_rule_22_10_violation:FALSE] shm_open sets errno per it's specification */
@@ -116,6 +116,11 @@ ATCA_STATUS hal_alloc_shared(
         }
         else
         {
+            if (fchmod(fd, (mode_t)(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IWGRP | S_IWOTH)) < 0)
+            {
+                (void)close(fd);
+                fd = -1;
+            }
             if (0 > ftruncate(fd, (off_t)size))
             {
                 (void)close(fd);
@@ -157,7 +162,14 @@ ATCA_STATUS hal_alloc_shared(
 
 ATCA_STATUS hal_free_shared(void * pShared, size_t size)
 {
-    return (0 != munmap(pShared, size)) ? ATCA_GEN_FAIL : ATCA_SUCCESS;
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if ((NULL != pShared) && (0u < size))
+    {
+        status = (0 != munmap(pShared, size)) ? ATCA_GEN_FAIL : ATCA_SUCCESS;
+    }
+
+    return status;
 }
 
 /**

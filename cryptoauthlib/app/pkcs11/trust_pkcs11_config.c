@@ -170,17 +170,14 @@ CK_RV pkcs11_trust_load_objects(pkcs11_slot_ctx_ptr pSlot)
         return CKR_ARGUMENTS_BAD;
     }
 
-    if (CKR_OK == rv)
+    rv = pkcs11_object_alloc(pSlot->slot_id, &pObject);
+    if (NULL != pObject)
     {
-        rv = pkcs11_object_alloc(pSlot->slot_id, &pObject);
-        if (NULL != pObject)
-        {
-            /* Slot 0 - Device Private Key */
-            (void)pkcs11_config_init_private(pObject, pkcs11_trust_device_private_key_label, strlen(pkcs11_trust_device_private_key_label));
-            pObject->slot = 0;
-            pObject->flags |= PKCS11_OBJECT_FLAG_TRUST_TYPE;
-            pObject->config = &pSlot->cfg_zone;
-        }
+        /* Slot 0 - Device Private Key */
+        (void)pkcs11_config_init_private(pObject, pkcs11_trust_device_private_key_label, strlen(pkcs11_trust_device_private_key_label));
+        pObject->slot = 0;
+        pObject->flags |= PKCS11_OBJECT_FLAG_TRUST_TYPE;
+        pObject->config = &pSlot->cfg_zone;
     }
 
     if (CKR_OK == rv)

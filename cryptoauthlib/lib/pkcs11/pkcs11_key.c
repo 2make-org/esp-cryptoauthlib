@@ -2037,6 +2037,7 @@ CK_RV pkcs11_key_generate_pair
             pData = &pPrivateKeyTemplate[i];
             break;
         default:
+            /* Do nothing */
             break;
         }
     }

@@ -373,7 +373,7 @@ CK_RV pkcs11_encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulD
 
     pSession->active_mech = CKM_VENDOR_DEFINED;
 
-    if (ATCA_SUCCESS != status && CKR_OK == rv)
+    if (ATCA_SUCCESS != status)
     {
         rv = pkcs11_util_convert_rv(status);
     }
@@ -477,7 +477,7 @@ CK_RV pkcs11_encrypt_update(
         (void)pkcs11_unlock_context(pLibCtx);
     }
 
-    if (ATCA_SUCCESS != status && CKR_OK == rv)
+    if (ATCA_SUCCESS != status)
     {
         rv = pkcs11_util_convert_rv(status);
     }
@@ -570,7 +570,7 @@ CK_RV pkcs11_encrypt_final(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pEncryptedDat
 
     (void)pkcs11_release_resource(pLibCtx, pSession, PKCS11_AES_OP);
 
-    if (ATCA_SUCCESS != status && CKR_OK == rv)
+    if (ATCA_SUCCESS != status)
     {
         rv = pkcs11_util_convert_rv(status);
     }
@@ -996,7 +996,7 @@ CK_RV pkcs11_decrypt_update(
         (void)pkcs11_unlock_context(pLibCtx);
     }
 
-    if (ATCA_SUCCESS != status && CKR_OK == rv)
+    if (ATCA_SUCCESS != status)
     {
         rv = pkcs11_util_convert_rv(status);
     }
