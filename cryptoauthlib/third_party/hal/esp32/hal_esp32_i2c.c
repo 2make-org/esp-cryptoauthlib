@@ -21,6 +21,7 @@
 #include "esp_log.h"
 #include "cryptoauthlib.h"
 #include "esp_idf_version.h"
+#include "esp_rom_sys.h"
 
 #if defined(CONFIG_ATCA_I2C_USE_LEGACY_DRIVER)
 #include <driver/i2c.h>
@@ -387,6 +388,7 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
                 .device_address = i2c_hal_data[bus].device_address,
                 .scl_speed_hz = i2c_hal_data[bus].speed,
                 .scl_wait_us = 0,
+                .flags.disable_ack_check = true,
             };
 
             rc = i2c_master_bus_add_device(i2c_hal_data[bus].bus_handle, &dev_cfg, &i2c_hal_data[bus].dev_handle);
@@ -503,7 +505,25 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t address, uint8_t *rxdata, u
         return ATCA_BAD_PARAM;
     }
 
-    rc = i2c_master_receive(hal_data->dev_handle, rxdata, *rxlength, 200);
+    int retries = 3;
+
+    while (retries--) {
+        rc = i2c_master_receive(hal_data->dev_handle, rxdata, *rxlength, 200);
+
+        // If we read 0xFF from the I2C device, typically it means that device is currently busy in
+        // some operation. We will retry with a small delay.
+        // This behaviour is introduced as the delay before a receive command doesnt seem to be handled by the CryptoAuthlib.
+
+        if (*rxlength == 1 && rxdata[0] == 0xFF) {
+            // Device is busy/not ready, retry or continue
+            // This is normal behavior, not an error
+            esp_rom_delay_us(25000);
+            continue;
+        } else {
+            break;
+        }
+    }
+
     if (ESP_OK == rc) {
         status = ATCA_SUCCESS;
     }
