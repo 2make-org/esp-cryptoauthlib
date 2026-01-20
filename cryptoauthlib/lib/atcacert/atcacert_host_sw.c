@@ -25,11 +25,13 @@
  * THIS SOFTWARE.
  */
 
+#include "atca_config.h"
+#include "cryptoauthlib.h"
 #include "atcacert_host_sw.h"
 #include "crypto/atca_crypto_sw.h"
 #include "cal_internal.h"
 
-#if ATCACERT_EN 
+#if ATCACERT_EN
 
 #if ATCAC_VERIFY_EN && ATCACERT_COMPCERT_EN
 ATCA_STATUS atcacert_verify_cert_sw(const atcacert_def_t* cert_def,

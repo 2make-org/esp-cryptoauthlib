@@ -45,6 +45,8 @@ This requires the `esp_idf_version.h' to be defined.
 #define ATCA_TNGTLS_SUPPORT
 #define ATCA_TNGLORA_SUPPORT
 
+#define ATCAC_CERT_ADD_EN 1
+#define ATCACERT_COMPCERT_EN 1
 /* \brief How long to wait after an initial wake failure for the POST to
  *         complete.
  * If Power-on self test (POST) is enabled, the self test will run on waking
