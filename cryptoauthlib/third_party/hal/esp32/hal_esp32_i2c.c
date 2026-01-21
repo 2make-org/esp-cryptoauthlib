@@ -505,7 +505,7 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t address, uint8_t *rxdata, u
         return ATCA_BAD_PARAM;
     }
 
-    int retries = 3;
+    int retries = 6;
 
     while (retries--) {
         rc = i2c_master_receive(hal_data->dev_handle, rxdata, *rxlength, 200);
