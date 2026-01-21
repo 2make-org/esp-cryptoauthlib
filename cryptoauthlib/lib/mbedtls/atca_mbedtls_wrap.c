@@ -1664,6 +1664,13 @@ int atca_mbedtls_cert_add(struct mbedtls_x509_crt * cert, const struct atcacert_
 
     if (0 == ret)
     {
+        /* For TNG/TrustFlex devices, the public_key_dev_loc.count may be 0 even when
+         * the CA public key buffer is needed for certificate reconstruction. Ensure
+         * the buffer length is set to the P-256 public key size if it wasn't already. */
+        if ((NULL != cert_def->ca_cert_def) && (0u == ca_key_buf.len))
+        {
+            ca_key_buf.len = ATCA_ECCP256_PUBKEY_SIZE;
+        }
         ret = atcacert_read_cert(cert_def, (cert_def->ca_cert_def != NULL) ? &ca_key_buf : NULL, cert_buf, &cert_len);
     }
 
