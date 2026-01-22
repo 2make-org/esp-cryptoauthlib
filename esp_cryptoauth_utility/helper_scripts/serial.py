@@ -55,11 +55,14 @@ class cmd_interpreter:
         # Configuration variables
         p_timeout = 10  # Timeout for the entire initialization process
         expected_version_pattern = re.compile(rb'v\d+\.\d+\.\d+')  # Regex for vX.Y.Z
+        # The firmware sends this prompt when it's ready to receive the version command
+        firmware_prompt_pattern = re.compile(rb'Initializing Command line: >>')
         version_resend_interval = 0.1  # Resend every 100ms
 
         # Initialization
         start_time = time.time()
         last_version_send_time = start_time
+        prompt_seen = False  # Track if we've seen the firmware's prompt
 
         # Start sending "version" immediately and periodically
         # The firmware will accept it as soon as it starts listening on this interface
@@ -81,8 +84,13 @@ class cmd_interpreter:
                     self.port.flush()
                     last_version_send_time = current_time
 
-                # Check for expected version response
-                if expected_version_pattern.search(line):
+                # Check if we've seen the firmware prompt (means firmware is ready)
+                if firmware_prompt_pattern.search(line):
+                    prompt_seen = True
+
+                # Check for expected version response - but ONLY if we've seen the prompt
+                # This prevents matching on boot log output like "App version: v1.0.1"
+                if prompt_seen and expected_version_pattern.search(line):
                     print('Version reply received - CLI Initialized.')
                     return True
 
