@@ -412,6 +412,26 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
     }
 }
 
+ATCA_STATUS hal_i2c_bus_handle_get(ATCAIface iface, void **bus_handle)
+{
+    if (!iface || !iface->hal_data || !bus_handle) {
+        return ATCA_BAD_PARAM;
+    }
+
+    ATCAIfaceCfg *cfg = iface->mIfaceCFG;
+    if (!cfg) {
+        return ATCA_BAD_PARAM;
+    }
+
+    ATCAI2CMaster_t *hal_data = iface->hal_data;
+    if (!hal_data || !hal_data->bus_handle || !hal_data->initialized) {
+        return ATCA_BAD_PARAM;
+    }
+
+    *bus_handle = hal_data->bus_handle;
+    return ATCA_SUCCESS;
+}
+
 /** \brief HAL implementation of I2C post init
  * \param[in] iface  instance
  * \return ATCA_SUCCESS
