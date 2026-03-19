@@ -170,7 +170,7 @@
 #define ATCA_TOSTRING(x) ATCA_STRINGIFY(x)
 
 #ifdef ATCA_PRINTF
-    #define ATCA_TRACE(s, m)         atca_trace_msg(s, __FILE__ ":" ATCA_TOSTRING(__LINE__) ":%x:" m "\n")
+    #define ATCA_TRACE(s, m)         atca_trace_msg(s, __FILE__ ":" ATCA_TOSTRING(__LINE__) ":%x:" m)
 #else
     #define ATCA_TRACE(s, m)         atca_trace(s)
 #endif
