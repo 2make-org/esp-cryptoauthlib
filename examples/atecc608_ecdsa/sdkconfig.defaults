@@ -1,6 +1,9 @@
-# For ESP-IDF 6.x+ (mbedtls 4.x):
-# - Use the direct CryptoAuthLib APIs (atcab_sign, atcab_verify_extern, etc.)
-# - The mbedTLS ALT integration is NOT compatible with mbedtls 4.x
+# Enable ATECC608A hardware ECDSA via PSA Crypto opaque driver (ESP-IDF 6.x+)
+CONFIG_MBEDTLS_SECURE_ELEMENT_DRIVER_ENABLED=y
 
-# For ESP-IDF 5.x and earlier (mbedtls 2.x/3.x), you can enable:
-# CONFIG_ATCA_MBEDTLS_ECDSA=y    # For mbedTLS ALT integration
+# I2C pins default to GPIO 21 (SDA) / GPIO 22 (SCL). If your board is wired
+# differently, set CONFIG_ATCA_I2C_SDA_PIN / CONFIG_ATCA_I2C_SCL_PIN in
+# menuconfig (Component config -> esp-cryptoauthlib).
+
+# For ESP-IDF 5.x and earlier (mbedtls 2.x/3.x), use the legacy ALT integration instead:
+# CONFIG_ATCA_MBEDTLS_ECDSA=y
