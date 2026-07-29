@@ -28,7 +28,7 @@ if(CONFIG_ATCA_MBEDTLS_ECDSA)
         list(APPEND COMPONENT_SRCDIRS "${CRYPTOAUTHLIB_DIR}/mbedtls")
     else()
         message(WARNING "ATCA_MBEDTLS_ECDSA is enabled but not supported on ESP-IDF 6.x+. "
-                       "Use CONFIG_MBEDTLS_HARDWARE_ATECC in ESP-IDF's mbedtls component instead.")
+                       "Use CONFIG_MBEDTLS_SE_HW_ECDSA_SIGN/VERIFY in ESP-IDF's mbedtls component instead.")
     endif()
 endif()
 
@@ -59,6 +59,13 @@ set(COMPONENT_PRIV_INCLUDEDIRS "port/include"
 
 # Required components
 set(COMPONENT_REQUIRES      "mbedtls" "freertos" "driver")
+
+# esp_security (esp_key_config.h) is only consumed by the PSA port on ESP-IDF 6.x+
+# and the component does not exist before ESP-IDF v5.4 — keep it conditional so
+# older ESP-IDF versions (component supports >=4.3) continue to build.
+if("${IDF_VERSION_MAJOR}" VERSION_GREATER_EQUAL "6")
+    list(APPEND COMPONENT_REQUIRES "esp_security")
+endif()
 
 # Don't include the default interface configurations from cryptoauthlib
 set(COMPONENT_EXCLUDE_SRCS "${CRYPTOAUTHLIB_DIR}/atca_cfgs.c")
