@@ -290,6 +290,10 @@ typedef struct atcaI2Cmaster {
     int port_num;
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
+    /* Second handle on the same bus, used only to emit the ATECC wake pulse. It is registered at
+     * address 0x00 and 100 kHz; the driver stores scl_speed_hz per device and reprograms the clock
+     * per transfer, so the wake byte goes out slowly while normal traffic stays at full speed. */
+    i2c_master_dev_handle_t wake_dev_handle;
     uint32_t speed;
     uint8_t device_address;
     int ref_ct;
@@ -393,6 +397,27 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
 
             rc = i2c_master_bus_add_device(i2c_hal_data[bus].bus_handle, &dev_cfg, &i2c_hal_data[bus].dev_handle);
             if (rc != ESP_OK) {
+                i2c_del_master_bus(i2c_hal_data[bus].bus_handle);
+                return ATCA_COMM_FAIL;
+            }
+
+            /* Wake device. The ATECC wakes only on SDA held continuously low for >= tWLO (~60 us).
+             * Addressing device 0x00 puts 8 consecutive zero bits on the wire: 80 us at 100 kHz,
+             * but only 20 us at 400 kHz - which is why the wake must run at its own slow clock.
+             * Sending more zero bytes instead would not help: the ACK slot between bytes releases
+             * SDA, breaking the continuous low that tWLO requires.
+             * disable_ack_check is REQUIRED here - nothing on the bus acknowledges address 0. */
+            i2c_device_config_t wake_cfg = {
+                .dev_addr_length         = I2C_ADDR_BIT_LEN_7,
+                .device_address          = 0x00,
+                .scl_speed_hz            = 100000,
+                .scl_wait_us             = 0,
+                .flags.disable_ack_check = true,
+            };
+
+            rc = i2c_master_bus_add_device(i2c_hal_data[bus].bus_handle, &wake_cfg, &i2c_hal_data[bus].wake_dev_handle);
+            if (rc != ESP_OK) {
+                i2c_master_bus_rm_device(i2c_hal_data[bus].dev_handle);
                 i2c_del_master_bus(i2c_hal_data[bus].bus_handle);
                 return ATCA_COMM_FAIL;
             }
@@ -560,6 +585,10 @@ ATCA_STATUS hal_i2c_release(void *hal_data)
     ATCAI2CMaster_t *hal = (ATCAI2CMaster_t*)hal_data;
 
     if (hal && --(hal->ref_ct) <= 0) {
+        if (hal->wake_dev_handle) {
+            i2c_master_bus_rm_device(hal->wake_dev_handle);
+            hal->wake_dev_handle = NULL;
+        }
         if (hal->dev_handle) {
             i2c_master_bus_rm_device(hal->dev_handle);
             hal->dev_handle = NULL;
@@ -580,14 +609,68 @@ ATCA_STATUS hal_i2c_release(void *hal_data)
  * \param[in]     paramlen       Length of the parameter
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
+/** \brief Wake the device.
+ *
+ * The ATECC leaves sleep only when SDA is held continuously low for at least tWLO (~60 us). This
+ * emits that pulse by writing one byte to the dedicated 100 kHz handle registered at address 0x00:
+ * the all-zero address byte is 8 consecutive low bits, i.e. 80 us at 100 kHz. At 400 kHz the same
+ * byte lasts only 20 us and will not wake the part, and sending additional zero bytes does not fix
+ * it because the ACK slot between bytes releases SDA and breaks the continuous low.
+ *
+ * Implementing this lets calib_wakeup_i2c() take its delegated path: with ATCA_HAL_CHANGE_BAUD
+ * reported as ATCA_UNIMPLEMENTED, it hands the whole wake here and never rewrites the interface
+ * address or the bus speed. That avoids re-creating the device handle around every wake (the old
+ * hal_i2c_change_baud behaviour, which returned ESP_ERR_INVALID_STATE and surfaced as
+ * ATCA_COMM_FAIL), and it does not depend on ifacecfg_set_address(), which this HAL ignores because
+ * send/receive are bound to a fixed device handle.
+ *
+ * \param[in] iface  interface to wake
+ * \return ATCA_SUCCESS if the device answered with the wake token, otherwise an error code.
+ */
+ATCA_STATUS hal_i2c_wake(ATCAIface iface)
+{
+    ATCAI2CMaster_t *hal_data;
+    uint8_t zero = 0x00;
+    uint8_t response[4] = { 0 };
+    uint16_t rxlength = (uint16_t)sizeof(response);
+
+    if ((NULL == iface) || (NULL == iface->mIfaceCFG)) {
+        return ATCA_BAD_PARAM;
+    }
+
+    hal_data = (ATCAI2CMaster_t*)iface->hal_data;
+    if (!hal_data || !hal_data->wake_dev_handle || !hal_data->initialized) {
+        return ATCA_BAD_PARAM;
+    }
+
+    /* Nothing acknowledges address 0, so a non-OK return here is expected and carries no
+     * information - the pulse is a side effect of the transfer, not its payload. */
+    (void)i2c_master_transmit(hal_data->wake_dev_handle, &zero, 1, 50);
+
+    /* tWHI: the device needs this long after the pulse before it can be addressed. */
+    atca_delay_us(atca_iface_get_wake_delay(iface));
+
+    if (ATCA_SUCCESS != hal_i2c_receive(iface, hal_data->device_address, response, &rxlength)) {
+        return ATCA_COMM_FAIL;
+    }
+
+    return hal_check_wake(response, (int)rxlength);
+}
+
 ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t paramlen)
 {
     (void)param;
     (void)paramlen;
 
     if (iface && iface->mIfaceCFG) {
-        if (ATCA_HAL_CHANGE_BAUD == option) {
-            return hal_i2c_change_baud(iface, *(uint32_t*)param);
+        if (ATCA_HAL_CONTROL_WAKE == option) {
+            return hal_i2c_wake(iface);
+        } else if (ATCA_HAL_CHANGE_BAUD == option) {
+            /* Deliberately unimplemented: calib_wakeup_i2c() reacts to ATCA_UNIMPLEMENTED here by
+             * delegating the entire wake to ATCA_HAL_CONTROL_WAKE above and returning. Implementing
+             * it instead would re-create the I2C device handle twice per wake attempt. The bus runs
+             * at the speed hal_i2c_init() registered; nothing needs to change it at runtime. */
+            return ATCA_UNIMPLEMENTED;
         } else {
             return ATCA_UNIMPLEMENTED;
         }
