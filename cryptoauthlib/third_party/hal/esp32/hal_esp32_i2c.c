@@ -295,7 +295,7 @@ typedef struct atcaI2Cmaster {
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
     /* Second handle on the same bus, used only to emit the ATECC wake pulse. It is registered at
-     * address 0x00 and 100 kHz; the driver stores scl_speed_hz per device and reprograms the clock
+     * address 0x00 and 50 kHz; the driver stores scl_speed_hz per device and reprograms the clock
      * per transfer, so the wake byte goes out slowly while normal traffic stays at full speed. */
     i2c_master_dev_handle_t wake_dev_handle;
     uint32_t speed;
