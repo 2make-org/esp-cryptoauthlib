@@ -123,7 +123,11 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
             i2c_hal_data[bus].conf.mode = I2C_MODE_MASTER;
             i2c_hal_data[bus].conf.sda_pullup_en = GPIO_PULLUP_DISABLE;
             i2c_hal_data[bus].conf.scl_pullup_en = GPIO_PULLUP_DISABLE;
-            i2c_hal_data[bus].conf.master.clk_speed = 100000; //cfg->atcai2c.baud;
+            /* Honour the bus speed the caller configured (ATCAIfaceCfg.atcai2c.baud), as every
+             * other HAL in the library does. Fall back to 100 kHz only if the cfg leaves it
+             * unset, since a 0 here would fail the driver configuration with an opaque error. */
+            i2c_hal_data[bus].conf.master.clk_speed =
+                (0u != ATCA_IFACECFG_VALUE(cfg, atcai2c.baud)) ? ATCA_IFACECFG_VALUE(cfg, atcai2c.baud) : 100000u;
 
             switch (bus) {
             case 0:
@@ -359,7 +363,12 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
         if (0 == i2c_hal_data[bus].ref_ct) {
             i2c_hal_data[bus].ref_ct = 1;
             i2c_hal_data[bus].port_num = bus;
-            i2c_hal_data[bus].speed = 100000; // Standard 100kHz for ATECC608A
+            /* Honour the bus speed the caller configured (ATCAIfaceCfg.atcai2c.baud), as every
+             * other HAL in the library does. Fall back to 100 kHz only if the cfg leaves it
+             * unset, since a 0 here would fail i2c_master_bus_add_device() with an opaque error.
+             * This is the speed of dev_handle only; the wake handle keeps its own slow clock. */
+            i2c_hal_data[bus].speed =
+                (0u != ATCA_IFACECFG_VALUE(cfg, atcai2c.baud)) ? ATCA_IFACECFG_VALUE(cfg, atcai2c.baud) : 100000u;
             i2c_hal_data[bus].initialized = false;
 
             // Configure I2C master bus
