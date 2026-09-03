@@ -437,7 +437,14 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
 
             i2c_hal_data[bus].initialized = true;
         } else {
+            /* A second caller sharing this bus: rc was never touched by this branch, so it still
+             * holds its ESP_FAIL initialiser above unless we set it here. Base the result on
+             * whether the earlier init that owns this ref actually finished, not just on having
+             * taken this branch -- ref_ct is bumped to 1 before the hardware calls below run, so a
+             * failed first init also leaves ref_ct nonzero with initialized left false. Reporting
+             * ESP_OK unconditionally here would claim success for a bus that was never brought up. */
             i2c_hal_data[bus].ref_ct++;
+            rc = i2c_hal_data[bus].initialized ? ESP_OK : ESP_FAIL;
         }
 
         iface->hal_data = &i2c_hal_data[bus];
