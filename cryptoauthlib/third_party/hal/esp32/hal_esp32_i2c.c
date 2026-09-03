@@ -402,15 +402,19 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg *cfg)
             }
 
             /* Wake device. The ATECC wakes only on SDA held continuously low for >= tWLO (~60 us).
-             * Addressing device 0x00 puts 8 consecutive zero bits on the wire: 80 us at 100 kHz,
-             * but only 20 us at 400 kHz - which is why the wake must run at its own slow clock.
+             * Addressing device 0x00 puts 8 consecutive zero bits on the wire, so the pulse width
+             * is set purely by this handle's clock: 160 us at 50 kHz, 80 us at 100 kHz, and only
+             * 20 us at 400 kHz (too short). 50 kHz is used to keep a wide margin over tWLO on a
+             * cold part; the cost is ~80 us more per wake, which is nothing next to tWHI.
              * Sending more zero bytes instead would not help: the ACK slot between bytes releases
              * SDA, breaking the continuous low that tWLO requires.
+             * The speed is per device handle in the new IDF driver, so only the wake byte is slow;
+             * normal traffic on dev_handle is unaffected.
              * disable_ack_check is REQUIRED here - nothing on the bus acknowledges address 0. */
             i2c_device_config_t wake_cfg = {
                 .dev_addr_length         = I2C_ADDR_BIT_LEN_7,
                 .device_address          = 0x00,
-                .scl_speed_hz            = 100000,
+                .scl_speed_hz            = 50000,
                 .scl_wait_us             = 0,
                 .flags.disable_ack_check = true,
             };
@@ -612,8 +616,8 @@ ATCA_STATUS hal_i2c_release(void *hal_data)
 /** \brief Wake the device.
  *
  * The ATECC leaves sleep only when SDA is held continuously low for at least tWLO (~60 us). This
- * emits that pulse by writing one byte to the dedicated 100 kHz handle registered at address 0x00:
- * the all-zero address byte is 8 consecutive low bits, i.e. 80 us at 100 kHz. At 400 kHz the same
+ * emits that pulse by writing one byte to the dedicated 50 kHz handle registered at address 0x00:
+ * the all-zero address byte is 8 consecutive low bits, i.e. 160 us at 50 kHz. At 400 kHz the same
  * byte lasts only 20 us and will not wake the part, and sending additional zero bytes does not fix
  * it because the ACK slot between bytes releases SDA and breaks the continuous low.
  *
